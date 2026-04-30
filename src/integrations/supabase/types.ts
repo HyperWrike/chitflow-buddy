@@ -14,16 +14,353 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chit_groups: {
+        Row: {
+          agreement_no: string | null
+          auction_day: number
+          auction_time: string | null
+          chit_value: number
+          commission_rate: number
+          created_at: string
+          duration_months: number
+          group_code: string
+          id: string
+          start_month: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agreement_no?: string | null
+          auction_day: number
+          auction_time?: string | null
+          chit_value: number
+          commission_rate?: number
+          created_at?: string
+          duration_months: number
+          group_code: string
+          id?: string
+          start_month?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agreement_no?: string | null
+          auction_day?: number
+          auction_time?: string | null
+          chit_value?: number
+          commission_rate?: number
+          created_at?: string
+          duration_months?: number
+          group_code?: string
+          id?: string
+          start_month?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dispatch_log: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          id: string
+          last_error: string | null
+          month: string
+          sent_at: string | null
+          statement_image_path: string | null
+          status: string
+          subscriber_id: string
+          whatsapp_number: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          month: string
+          sent_at?: string | null
+          statement_image_path?: string | null
+          status?: string
+          subscriber_id: string
+          whatsapp_number: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          month?: string
+          sent_at?: string | null
+          statement_image_path?: string | null
+          status?: string
+          subscriber_id?: string
+          whatsapp_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_log_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_dues: {
+        Row: {
+          base_installment: number
+          chit_amount_due: number
+          created_at: string
+          id: string
+          manual_override: boolean
+          monthly_entry_id: string
+          previous_bid: number | null
+          share_of_discount: number
+          subscription_id: string
+        }
+        Insert: {
+          base_installment: number
+          chit_amount_due: number
+          created_at?: string
+          id?: string
+          manual_override?: boolean
+          monthly_entry_id: string
+          previous_bid?: number | null
+          share_of_discount?: number
+          subscription_id: string
+        }
+        Update: {
+          base_installment?: number
+          chit_amount_due?: number
+          created_at?: string
+          id?: string
+          manual_override?: boolean
+          monthly_entry_id?: string
+          previous_bid?: number | null
+          share_of_discount?: number
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_dues_monthly_entry_id_fkey"
+            columns: ["monthly_entry_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_dues_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_entries: {
+        Row: {
+          company_commission: number
+          created_at: string
+          entered_by: string | null
+          group_id: string
+          id: string
+          locked: boolean
+          month: string
+          prized_subscription_id: string | null
+          winning_bid: number
+        }
+        Insert: {
+          company_commission: number
+          created_at?: string
+          entered_by?: string | null
+          group_id: string
+          id?: string
+          locked?: boolean
+          month: string
+          prized_subscription_id?: string | null
+          winning_bid: number
+        }
+        Update: {
+          company_commission?: number
+          created_at?: string
+          entered_by?: string | null
+          group_id?: string
+          id?: string
+          locked?: boolean
+          month?: string
+          prized_subscription_id?: string | null
+          winning_bid?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_entries_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chit_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_entries_prized_subscription_id_fkey"
+            columns: ["prized_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          name?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+        }
+        Relationships: []
+      }
+      subscribers: {
+        Row: {
+          access_code: string
+          active: boolean
+          address_line1: string | null
+          address_line2: string | null
+          alt_number: string | null
+          city: string
+          created_at: string
+          id: string
+          name: string
+          pincode: string | null
+          updated_at: string
+          whatsapp_number: string
+        }
+        Insert: {
+          access_code: string
+          active?: boolean
+          address_line1?: string | null
+          address_line2?: string | null
+          alt_number?: string | null
+          city?: string
+          created_at?: string
+          id?: string
+          name: string
+          pincode?: string | null
+          updated_at?: string
+          whatsapp_number: string
+        }
+        Update: {
+          access_code?: string
+          active?: boolean
+          address_line1?: string | null
+          address_line2?: string | null
+          alt_number?: string | null
+          city?: string
+          created_at?: string
+          id?: string
+          name?: string
+          pincode?: string | null
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          active: boolean
+          created_at: string
+          group_id: string
+          id: string
+          name_on_chit: string
+          prized: boolean
+          prized_month: string | null
+          seat_count: number
+          subscriber_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          group_id: string
+          id?: string
+          name_on_chit: string
+          prized?: boolean
+          prized_month?: string | null
+          seat_count?: number
+          subscriber_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          group_id?: string
+          id?: string
+          name_on_chit?: string
+          prized?: boolean
+          prized_month?: string | null
+          seat_count?: number
+          subscriber_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chit_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "subscribers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "operator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +487,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "operator"],
+    },
   },
 } as const
