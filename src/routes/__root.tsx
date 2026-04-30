@@ -40,7 +40,6 @@ export const Route = createRootRoute({
       { property: "og:description", content: "Internal management software for Panasuna Chits (P) Ltd, Salem." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
