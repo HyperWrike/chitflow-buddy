@@ -164,16 +164,16 @@ function EntryForm({ groupId, month, onClose }: { groupId: string; month: string
   const [winningBid, setWinningBid] = useState<string>("");
   const [commission, setCommission] = useState<string>("");
   const [prizedSubId, setPrizedSubId] = useState<string>("");
+  const [hydrated, setHydrated] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // hydrate from existing
-  useState(() => {
-    if (existing.data) {
-      setWinningBid(String(existing.data.winning_bid));
-      setCommission(String(existing.data.company_commission));
-      setPrizedSubId(existing.data.prized_subscription_id ?? "");
-    }
-  });
+  // hydrate from existing entry once loaded
+  if (existing.data && !hydrated) {
+    setWinningBid(String(existing.data.winning_bid));
+    setCommission(String(existing.data.company_commission));
+    setPrizedSubId(existing.data.prized_subscription_id ?? "");
+    setHydrated(true);
+  }
 
   const totalSeats = (subs.data ?? []).reduce((s, m: any) => s + m.seat_count, 0);
 
@@ -191,10 +191,11 @@ function EntryForm({ groupId, month, onClose }: { groupId: string; month: string
     return totals;
   }, [group.data, winningBid, totalSeats]);
 
-  // auto-fill commission once
-  useState(() => {
-    if (calc && !commission) setCommission(String(Math.round(calc.company_commission)));
-  });
+  // auto-fill commission when calc becomes available
+  if (calc && !commission) {
+    // safe: setState in render with a guard avoids loops
+    setCommission(String(Math.round(calc.company_commission)));
+  }
 
   const memberRows = useMemo(() => {
     if (!calc) return [];
