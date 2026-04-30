@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SubscribersRouteImport } from './routes/subscribers'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as GroupsRouteImport } from './routes/groups'
+import { Route as DataEntryRouteImport } from './routes/data-entry'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscribersIdRouteImport } from './routes/subscribers.$id'
+import { Route as GroupsIdRouteImport } from './routes/groups.$id'
 
 const SubscribersRoute = SubscribersRouteImport.update({
   id: '/subscribers',
@@ -22,6 +25,16 @@ const SubscribersRoute = SubscribersRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GroupsRoute = GroupsRouteImport.update({
+  id: '/groups',
+  path: '/groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DataEntryRoute = DataEntryRouteImport.update({
+  id: '/data-entry',
+  path: '/data-entry',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -34,36 +47,74 @@ const SubscribersIdRoute = SubscribersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => SubscribersRoute,
 } as any)
+const GroupsIdRoute = GroupsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => GroupsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/data-entry': typeof DataEntryRoute
+  '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/data-entry': typeof DataEntryRoute
+  '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/data-entry': typeof DataEntryRoute
+  '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/subscribers' | '/subscribers/$id'
+  fullPaths:
+    | '/'
+    | '/data-entry'
+    | '/groups'
+    | '/login'
+    | '/subscribers'
+    | '/groups/$id'
+    | '/subscribers/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/subscribers' | '/subscribers/$id'
-  id: '__root__' | '/' | '/login' | '/subscribers' | '/subscribers/$id'
+  to:
+    | '/'
+    | '/data-entry'
+    | '/groups'
+    | '/login'
+    | '/subscribers'
+    | '/groups/$id'
+    | '/subscribers/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/data-entry'
+    | '/groups'
+    | '/login'
+    | '/subscribers'
+    | '/groups/$id'
+    | '/subscribers/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DataEntryRoute: typeof DataEntryRoute
+  GroupsRoute: typeof GroupsRouteWithChildren
   LoginRoute: typeof LoginRoute
   SubscribersRoute: typeof SubscribersRouteWithChildren
 }
@@ -84,6 +135,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/groups': {
+      id: '/groups'
+      path: '/groups'
+      fullPath: '/groups'
+      preLoaderRoute: typeof GroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/data-entry': {
+      id: '/data-entry'
+      path: '/data-entry'
+      fullPath: '/data-entry'
+      preLoaderRoute: typeof DataEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -98,8 +163,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubscribersIdRouteImport
       parentRoute: typeof SubscribersRoute
     }
+    '/groups/$id': {
+      id: '/groups/$id'
+      path: '/$id'
+      fullPath: '/groups/$id'
+      preLoaderRoute: typeof GroupsIdRouteImport
+      parentRoute: typeof GroupsRoute
+    }
   }
 }
+
+interface GroupsRouteChildren {
+  GroupsIdRoute: typeof GroupsIdRoute
+}
+
+const GroupsRouteChildren: GroupsRouteChildren = {
+  GroupsIdRoute: GroupsIdRoute,
+}
+
+const GroupsRouteWithChildren =
+  GroupsRoute._addFileChildren(GroupsRouteChildren)
 
 interface SubscribersRouteChildren {
   SubscribersIdRoute: typeof SubscribersIdRoute
@@ -115,9 +198,20 @@ const SubscribersRouteWithChildren = SubscribersRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DataEntryRoute: DataEntryRoute,
+  GroupsRoute: GroupsRouteWithChildren,
   LoginRoute: LoginRoute,
   SubscribersRoute: SubscribersRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
