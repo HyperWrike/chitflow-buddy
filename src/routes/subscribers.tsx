@@ -58,7 +58,7 @@ function Subscribers() {
           <h1 className="text-3xl font-bold tracking-tight">Subscribers</h1>
           <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} total</p>
         </div>
-        {isAdmin && <SubscriberDialog />}
+        <SubscriberDialog />
       </div>
 
       <div className="relative max-w-md">
@@ -107,7 +107,7 @@ function Subscribers() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isAdmin && <SubscriberDialog existing={s} />}
+                    <SubscriberDialog existing={s} />
                   </td>
                 </tr>
               ))}
