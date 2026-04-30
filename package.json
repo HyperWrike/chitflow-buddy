@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "postbuild": "node -e \"const fs = require('fs'); const server = require('./dist/server/server.js'); server.default.fetch(new Request('http://localhost/')).then(r => r.text()).then(html => fs.writeFileSync('./dist/client/index.html', html))\"",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
