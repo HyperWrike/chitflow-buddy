@@ -20,6 +20,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscribersIdRouteImport } from './routes/subscribers.$id'
 import { Route as GroupsIdRouteImport } from './routes/groups.$id'
 import { Route as CommunicationsRemindersRouteImport } from './routes/communications.reminders'
+import { Route as CommunicationsOffersRouteImport } from './routes/communications.offers'
 
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
@@ -76,6 +77,11 @@ const CommunicationsRemindersRoute = CommunicationsRemindersRouteImport.update({
   path: '/communications/reminders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommunicationsOffersRoute = CommunicationsOffersRouteImport.update({
+  id: '/communications/offers',
+  path: '/communications/offers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/communications/offers'
     | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/communications/offers'
     | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/communications/offers'
     | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SubscribersRoute: typeof SubscribersRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
+  CommunicationsOffersRoute: typeof CommunicationsOffersRoute
   CommunicationsRemindersRoute: typeof CommunicationsRemindersRoute
 }
 
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommunicationsRemindersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/communications/offers': {
+      id: '/communications/offers'
+      path: '/communications/offers'
+      fullPath: '/communications/offers'
+      preLoaderRoute: typeof CommunicationsOffersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -285,6 +305,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SubscribersRoute: SubscribersRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
+  CommunicationsOffersRoute: CommunicationsOffersRoute,
   CommunicationsRemindersRoute: CommunicationsRemindersRoute,
 }
 export const routeTree = rootRouteImport
