@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as SubscribersRouteImport } from './routes/subscribers'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as DispatchRouteImport } from './routes/dispatch'
@@ -27,6 +28,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
 const SubscribersRoute = SubscribersRouteImport.update({
   id: '/subscribers',
   path: '/subscribers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/groups/$id': typeof GroupsIdRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/groups/$id': typeof GroupsIdRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
   '/groups/$id': typeof GroupsIdRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
     | '/templates'
     | '/groups/$id'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
     | '/templates'
     | '/groups/$id'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
     | '/templates'
     | '/groups/$id'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   DispatchRoute: typeof DispatchRoute
   GroupsRoute: typeof GroupsRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SettingsRoute: typeof SettingsRoute
   SubscribersRoute: typeof SubscribersRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
 }
@@ -159,6 +172,13 @@ declare module '@tanstack/react-router' {
       path: '/subscribers'
       fullPath: '/subscribers'
       preLoaderRoute: typeof SubscribersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   DispatchRoute: DispatchRoute,
   GroupsRoute: GroupsRouteWithChildren,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   SubscribersRoute: SubscribersRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
 }
