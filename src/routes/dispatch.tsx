@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Copy,
   Zap,
+  Trash,
 } from "lucide-react";
 import { toBlob } from "html-to-image";
 import {
@@ -182,6 +183,24 @@ function Dispatch() {
     toast.success(`${ok} statement(s) prepared using ${sendMode}.`);
   };
 
+  const deleteAll = async () => {
+    if (!confirm(`Delete dispatch logs for ${filtered.length} subscriber(s) for ${formatMonth(month)}? This cannot be undone.`))
+      return;
+    try {
+      const ids = filtered.map((s: any) => s.subscriber.id);
+      if (ids.length === 0) {
+        toast.info("No records to delete.");
+        return;
+      }
+      await db.from("dispatch_log").delete().in("subscriber_id", ids).eq("month", month);
+      qc.invalidateQueries({ queryKey: ["dispatch-summary", month] });
+      toast.success(`Deleted dispatch logs for ${ids.length} subscriber(s).`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to delete dispatch logs.");
+    }
+  };
+
   const copyModeNote = async () => {
     const note = `Send mode: ${sendMode}\nMonth: ${formatMonth(month)}\nRecords: ${filtered.length}`;
     await navigator.clipboard.writeText(note);
@@ -204,6 +223,9 @@ function Dispatch() {
           </Button>
           <Button onClick={sendAll}>
             <Send className="mr-2 h-4 w-4" /> Send All Pending
+          </Button>
+          <Button variant="destructive" onClick={deleteAll}>
+            <Trash className="mr-2 h-4 w-4" /> Delete All Logs
           </Button>
         </div>
       </div>
