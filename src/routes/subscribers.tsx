@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { Plus, Search, Pencil } from "lucide-react";
+import { Plus, Search, Pencil, Trash } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
@@ -116,15 +116,32 @@ function Subscribers() {
           <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} total</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-          <div>
-            <input type="file" accept=".csv" id="import-csv" className="hidden" onChange={handleImport} />
-            <Button variant="outline" asChild>
-              <label htmlFor="import-csv" className="cursor-pointer">
-                <Upload className="mr-2 h-4 w-4" /> Import CSV
-              </label>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+            <div>
+              <input type="file" accept=".csv" id="import-csv" className="hidden" onChange={handleImport} />
+              <Button variant="outline" asChild>
+                <label htmlFor="import-csv" className="cursor-pointer">
+                  <Upload className="mr-2 h-4 w-4" /> Import CSV
+                </label>
+              </Button>
+            </div>
+            <Button variant="destructive" onClick={async () => {
+              if (!confirm('Delete ALL subscribers? This cannot be undone.')) return;
+              try {
+                const ids = (list.data ?? []).map(s => s.id);
+                if (ids.length === 0) { toast.info('No subscribers to delete'); return; }
+                await db.from('subscribers').delete().in('id', ids);
+                qc.invalidateQueries({ queryKey: ['subscribers'] });
+                toast.success(`Deleted ${ids.length} subscriber(s)`);
+              } catch (err: any) {
+                console.error(err);
+                toast.error('Failed to delete subscribers');
+              }
+            }}>
+              <Trash className="mr-2 h-4 w-4" /> Delete All
             </Button>
           </div>
           <SubscriberDialog />
@@ -177,7 +194,23 @@ function Subscribers() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <SubscriberDialog existing={s} />
+                    <div className="inline-flex items-center gap-2">
+                      <SubscriberDialog existing={s} />
+                      <Button variant="ghost" size="sm" onClick={async () => {
+                        if (!confirm(`Delete subscriber ${s.name}? This cannot be undone.`)) return;
+                        try {
+                          const { error } = await db.from('subscribers').delete().eq('id', s.id);
+                          if (error) throw error;
+                          qc.invalidateQueries({ queryKey: ['subscribers'] });
+                          toast.success('Subscriber deleted');
+                        } catch (err: any) {
+                          console.error(err);
+                          toast.error('Failed to delete');
+                        }
+                      }}>
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
