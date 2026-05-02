@@ -15,6 +15,10 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 
+import Papa from 'papaparse';
+import { downloadCSV } from "@/lib/export";
+import { Upload, Download } from "lucide-react";
+
 export const Route = createFileRoute("/subscribers")({
   component: SubscribersPage,
   head: () => ({ meta: [{ title: "Subscribers — Panasuna Chits" }] }),
@@ -31,6 +35,7 @@ function SubscribersPage() {
 function Subscribers() {
   const [search, setSearch] = useState("");
   const { isAdmin } = useAuth();
+  const qc = useQueryClient();
 
   const list = useQuery({
     queryKey: ["subscribers"],
@@ -40,6 +45,58 @@ function Subscribers() {
       return data as Subscriber[];
     },
   });
+
+  const handleExport = () => {
+    if (!list.data) return;
+    const exportData = list.data.map(s => ({
+      Code: s.access_code,
+      Name: s.name,
+      WhatsApp: s.whatsapp_number,
+      AltPhone: s.alt_number || '',
+      Address1: s.address_line1 || '',
+      Address2: s.address_line2 || '',
+      City: s.city || '',
+      Pincode: s.pincode || '',
+      Active: s.active ? 'Yes' : 'No'
+    }));
+    downloadCSV(exportData, 'subscribers.csv');
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = results.data as any[];
+        toast.info(`Importing ${rows.length} subscribers...`);
+        let imported = 0;
+        for (const row of rows) {
+          try {
+            if (!row.Name || !row.WhatsApp) continue;
+            const payload = {
+              access_code: row.Code || `IMP${Math.floor(Math.random() * 10000)}`,
+              name: row.Name,
+              whatsapp_number: String(row.WhatsApp).replace(/\D/g, "").slice(-10),
+              alt_number: row.AltPhone || null,
+              address_line1: row.Address1 || null,
+              address_line2: row.Address2 || null,
+              city: row.City || "Unknown",
+              pincode: row.Pincode || null,
+              active: row.Active?.toLowerCase() !== 'no'
+            };
+            await db.from("subscribers").insert(payload);
+            imported++;
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        toast.success(`Successfully imported ${imported} subscribers`);
+        qc.invalidateQueries({ queryKey: ["subscribers"] });
+      }
+    });
+  };
 
   const filtered = (list.data ?? []).filter((s) => {
     const q = search.toLowerCase();
@@ -58,7 +115,20 @@ function Subscribers() {
           <h1 className="text-3xl font-bold tracking-tight">Subscribers</h1>
           <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} total</p>
         </div>
-        <SubscriberDialog />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <div>
+            <input type="file" accept=".csv" id="import-csv" className="hidden" onChange={handleImport} />
+            <Button variant="outline" asChild>
+              <label htmlFor="import-csv" className="cursor-pointer">
+                <Upload className="mr-2 h-4 w-4" /> Import CSV
+              </label>
+            </Button>
+          </div>
+          <SubscriberDialog />
+        </div>
       </div>
 
       <div className="relative max-w-md">

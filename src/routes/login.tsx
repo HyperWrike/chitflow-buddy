@@ -56,11 +56,20 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-sidebar to-primary p-4">
-      <Card className="w-full max-w-md p-8 shadow-xl">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(245,166,35,0.14),transparent_30%),radial-gradient(circle_at_top_right,rgba(15,39,68,0.18),transparent_35%),linear-gradient(180deg,#f8fbff,#eef3f9)] p-4">
+      <Card className="w-full max-w-md border-border/80 bg-white/95 p-8 shadow-2xl backdrop-blur">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold text-primary">PANASUNA CHITS</h1>
-          <p className="text-sm text-muted-foreground">Management Portal — Salem</p>
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+            <span className="font-display text-2xl">P</span>
+          </div>
+          <h1 className="font-display text-3xl text-foreground">Panasuna Chits</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Management Portal · Salem, Tamil Nadu
+          </p>
+          <div className="mt-4 rounded-xl border border-border bg-muted/35 px-4 py-3 text-left text-xs leading-5 text-muted-foreground">
+            Complete chit-fund operations workspace for subscribers, groups, monthly data entry, and
+            WhatsApp dispatch.
+          </div>
         </div>
 
         <Tabs defaultValue="signin">
@@ -135,7 +144,8 @@ function LoginPage() {
                 Create Account
               </Button>
               <p className="text-xs text-muted-foreground">
-                The first staff account created becomes admin. Subsequent accounts default to operator.
+                The first staff account created becomes admin. Subsequent accounts default to
+                operator.
               </p>
             </form>
           </TabsContent>

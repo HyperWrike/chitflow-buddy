@@ -1,9 +1,8 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
-
 @custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -52,46 +51,37 @@
 
 :root {
   --radius: 0.5rem;
-
   /* Panasuna brand: Navy + Gold */
-  --background: oklch(0.985 0.005 250);          /* near-white, slight cool */
+  --background: oklch(0.985 0.005 250);
+  /* near-white, slight cool */
   --foreground: oklch(0.22 0.04 260);
-
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.22 0.04 260);
-
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.04 260);
-
   /* Primary = Navy #1B3A5C */
   --primary: oklch(0.34 0.07 252);
   --primary-foreground: oklch(0.98 0.005 250);
-  --primary-glow: oklch(0.46 0.10 252);
-
+  --primary-glow: oklch(0.46 0.1 252);
   --secondary: oklch(0.95 0.012 250);
   --secondary-foreground: oklch(0.28 0.05 258);
-
   --muted: oklch(0.96 0.008 250);
   --muted-foreground: oklch(0.5 0.02 256);
-
-  --accent: oklch(0.94 0.04 85);                  /* soft gold tint */
+  --accent: oklch(0.94 0.04 85);
+  /* soft gold tint */
   --accent-foreground: oklch(0.28 0.05 258);
-
   /* Gold #F5A623 */
   --gold: oklch(0.78 0.16 75);
   --gold-foreground: oklch(0.22 0.04 260);
-
   --success: oklch(0.65 0.15 150);
   --success-foreground: oklch(0.99 0 0);
   --warning: oklch(0.78 0.16 75);
   --warning-foreground: oklch(0.22 0.04 260);
   --destructive: oklch(0.58 0.22 27);
   --destructive-foreground: oklch(0.99 0 0);
-
   --border: oklch(0.9 0.012 250);
   --input: oklch(0.9 0.012 250);
-  --ring: oklch(0.46 0.10 252);
-
+  --ring: oklch(0.46 0.1 252);
   /* Sidebar = navy */
   --sidebar: oklch(0.28 0.06 255);
   --sidebar-foreground: oklch(0.95 0.01 250);
@@ -101,15 +91,16 @@
   --sidebar-accent-foreground: oklch(0.98 0.005 250);
   --sidebar-border: oklch(0.34 0.07 252);
   --sidebar-ring: oklch(0.78 0.16 75);
-
   --chart-1: oklch(0.34 0.07 252);
   --chart-2: oklch(0.78 0.16 75);
   --chart-3: oklch(0.65 0.15 150);
   --chart-4: oklch(0.55 0.18 25);
   --chart-5: oklch(0.5 0.14 285);
-
   --gradient-header: linear-gradient(135deg, oklch(0.28 0.06 255), oklch(0.36 0.08 252));
   --shadow-card: 0 1px 3px oklch(0.34 0.07 252 / 0.08), 0 4px 12px oklch(0.34 0.07 252 / 0.06);
+  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "DM Serif Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 .dark {
@@ -134,10 +125,52 @@
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-feature-settings: "tnum" on, "lnum" on;
+    font-family: var(--font-body);
+    font-feature-settings:
+      "tnum" on,
+      "lnum" on;
+    background-image:
+      radial-gradient(circle at top left, oklch(0.92 0.03 250 / 0.55), transparent 35%),
+      radial-gradient(circle at top right, oklch(0.84 0.08 85 / 0.18), transparent 32%),
+      linear-gradient(
+        180deg,
+        oklch(0.99 0.004 250),
+        oklch(0.985 0.005 250) 18%,
+        oklch(0.975 0.01 250)
+      );
+    min-height: 100vh;
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  code,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  .panel-surface {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-card);
+  }
+  .soft-grid {
+    background-image:
+      linear-gradient(to right, rgba(15, 39, 68, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(15, 39, 68, 0.04) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 }

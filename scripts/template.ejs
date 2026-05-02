@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+    
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 0;
+      width: 1000px;
+      background: #ffffff;
+      color: #000;
+    }
+    .container {
+      border: 2px solid #000;
+    }
+    
+    /* Header Section */
+    .header {
+      background-color: #002B5E; /* Dark blue */
+      color: #ffffff;
+      text-align: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #000;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .header p {
+      margin: 2px 0;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    /* Sub Header (Orange bar) */
+    .sub-header {
+      background-color: #FFB366; /* Light orange */
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 15px;
+      font-weight: 700;
+      border-bottom: 1px solid #000;
+      font-size: 15px;
+    }
+    .sub-header div {
+      flex: 1;
+      text-align: center;
+    }
+    .sub-header .left { text-align: left; }
+    .sub-header .right { text-align: right; }
+    
+    /* Address & Details Section */
+    .details {
+      display: flex;
+      background-color: #E6E6FA; /* Light purple/blue */
+      border-bottom: 1px solid #000;
+    }
+    .address-col {
+      flex: 1;
+      padding: 15px;
+      border-right: 1px solid #000;
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .info-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .info-top {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      border-bottom: 1px solid #000;
+      padding: 15px;
+    }
+    .info-bottom {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 10px;
+    }
+    
+    /* Note */
+    .note {
+      text-align: center;
+      font-weight: 700;
+      padding: 8px;
+      background-color: #FFDAB9; /* Very light orange/peach */
+      border-bottom: 1px solid #000;
+      font-size: 15px;
+    }
+    
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px 4px;
+    }
+    th {
+      background-color: #002B5E;
+      color: white;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    td {
+      background-color: #ffffff;
+      font-weight: 500;
+    }
+    .text-left { text-align: left; padding-left: 8px; }
+    .text-right { text-align: right; padding-right: 8px; }
+    
+    /* Total Row */
+    .total-row td {
+      background-color: #FFB366;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .total-label {
+      text-align: center;
+      border-right: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>ABC Chits (P) Ltd.</h1>
+      <p>Car street, Salem - 636005.</p>
+      <p>(A ROSCA Institution)</p>
+    </div>
+    
+    <div class="sub-header">
+      <div class="left">Phone No: &nbsp;&nbsp;&nbsp;9842567890</div>
+      <div>Good Day Wishes !!!</div>
+      <div class="right">Member Code: <%= subscriber.access_code %></div>
+    </div>
+    
+    <div class="details">
+      <div class="address-col">
+        Dear <b><%= subscriber.name %></b>,<br>
+        <%= subscriber.address_line1 || '' %><br>
+        <%= subscriber.address_line2 || '' %><br>
+        <%= subscriber.city %> <%= subscriber.pincode ? '- ' + subscriber.pincode : '' %>.
+      </div>
+      <div class="info-col">
+        <div class="info-top"><%= monthName %> Chit Details</div>
+        <div class="info-bottom">(Auction Time : <%= auctionTime || '5.00 PM' %> @ Office/Mob:9842360611)</div>
+      </div>
+    </div>
+    
+    <div class="note">
+      Kindly note the chit amount and pay before Auction Date.
+    </div>
+    
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">Auction<br>Date</th>
+          <th width="8%">Group</th>
+          <th width="22%">Subscriber Name</th>
+          <th width="6%">Prized<br>(Yes/No)</th>
+          <th width="12%">Chit Value</th>
+          <th width="12%">Previous Bid<br>Amount</th>
+          <th width="10%">Share of<br>Discount</th>
+          <th width="8%">Period</th>
+          <th width="16%">Chit Amount<br>(After Incentive)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(row => { %>
+          <tr>
+            <td><%= row.auction_day %></td>
+            <td><%= row.group_code %></td>
+            <td class="text-left"><%= row.name_on_chit %></td>
+            <td><%= row.prized ? 'Yes' : 'No' %></td>
+            <td class="text-right"><%= formatINR(row.chit_value) %></td>
+            <td class="text-right"><%= formatINR(row.previous_bid || 0) %></td>
+            <td class="text-right"><%= formatINR(row.share_of_discount) %></td>
+            <td><%= row.period %></td>
+            <td class="text-right" style="background-color: #D8BFD8;"><%= formatINR(row.amount_due) %></td>
+          </tr>
+        <% }); %>
+        
+        <tr class="total-row">
+          <td colspan="8" class="total-label">Total</td>
+          <td class="text-right"><%= formatINR(totalDue) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
