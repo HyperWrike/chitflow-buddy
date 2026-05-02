@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as SubscribersRouteImport } from './routes/subscribers'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as DispatchRouteImport } from './routes/dispatch'
@@ -17,10 +19,23 @@ import { Route as DataEntryRouteImport } from './routes/data-entry'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscribersIdRouteImport } from './routes/subscribers.$id'
 import { Route as GroupsIdRouteImport } from './routes/groups.$id'
+import { Route as CommunicationsRemindersRouteImport } from './routes/communications.reminders'
+import { Route as CommunicationsReceiptsRouteImport } from './routes/communications.receipts'
+import { Route as CommunicationsOffersRouteImport } from './routes/communications.offers'
 
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SubscribersRoute = SubscribersRouteImport.update({
   id: '/subscribers',
   path: '/subscribers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -58,6 +73,21 @@ const GroupsIdRoute = GroupsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => GroupsRoute,
 } as any)
+const CommunicationsRemindersRoute = CommunicationsRemindersRouteImport.update({
+  id: '/communications/reminders',
+  path: '/communications/reminders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunicationsReceiptsRoute = CommunicationsReceiptsRouteImport.update({
+  id: '/communications/receipts',
+  path: '/communications/receipts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunicationsOffersRoute = CommunicationsOffersRouteImport.update({
+  id: '/communications/offers',
+  path: '/communications/offers',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,7 +95,12 @@ export interface FileRoutesByFullPath {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
+  '/communications/receipts': typeof CommunicationsReceiptsRoute
+  '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
@@ -75,7 +110,12 @@ export interface FileRoutesByTo {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
+  '/communications/receipts': typeof CommunicationsReceiptsRoute
+  '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
@@ -86,7 +126,12 @@ export interface FileRoutesById {
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
   '/login': typeof LoginRoute
+  '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
+  '/templates': typeof TemplatesRoute
+  '/communications/offers': typeof CommunicationsOffersRoute
+  '/communications/receipts': typeof CommunicationsReceiptsRoute
+  '/communications/reminders': typeof CommunicationsRemindersRoute
   '/groups/$id': typeof GroupsIdRoute
   '/subscribers/$id': typeof SubscribersIdRoute
 }
@@ -98,7 +143,12 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
+    | '/templates'
+    | '/communications/offers'
+    | '/communications/receipts'
+    | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -108,7 +158,12 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
+    | '/templates'
+    | '/communications/offers'
+    | '/communications/receipts'
+    | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
   id:
@@ -118,7 +173,12 @@ export interface FileRouteTypes {
     | '/dispatch'
     | '/groups'
     | '/login'
+    | '/settings'
     | '/subscribers'
+    | '/templates'
+    | '/communications/offers'
+    | '/communications/receipts'
+    | '/communications/reminders'
     | '/groups/$id'
     | '/subscribers/$id'
   fileRoutesById: FileRoutesById
@@ -129,16 +189,35 @@ export interface RootRouteChildren {
   DispatchRoute: typeof DispatchRoute
   GroupsRoute: typeof GroupsRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SettingsRoute: typeof SettingsRoute
   SubscribersRoute: typeof SubscribersRouteWithChildren
+  TemplatesRoute: typeof TemplatesRoute
+  CommunicationsOffersRoute: typeof CommunicationsOffersRoute
+  CommunicationsReceiptsRoute: typeof CommunicationsReceiptsRoute
+  CommunicationsRemindersRoute: typeof CommunicationsRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/subscribers': {
       id: '/subscribers'
       path: '/subscribers'
       fullPath: '/subscribers'
       preLoaderRoute: typeof SubscribersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -190,6 +269,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GroupsIdRouteImport
       parentRoute: typeof GroupsRoute
     }
+    '/communications/reminders': {
+      id: '/communications/reminders'
+      path: '/communications/reminders'
+      fullPath: '/communications/reminders'
+      preLoaderRoute: typeof CommunicationsRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/communications/receipts': {
+      id: '/communications/receipts'
+      path: '/communications/receipts'
+      fullPath: '/communications/receipts'
+      preLoaderRoute: typeof CommunicationsReceiptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/communications/offers': {
+      id: '/communications/offers'
+      path: '/communications/offers'
+      fullPath: '/communications/offers'
+      preLoaderRoute: typeof CommunicationsOffersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -222,7 +322,12 @@ const rootRouteChildren: RootRouteChildren = {
   DispatchRoute: DispatchRoute,
   GroupsRoute: GroupsRouteWithChildren,
   LoginRoute: LoginRoute,
+  SettingsRoute: SettingsRoute,
   SubscribersRoute: SubscribersRouteWithChildren,
+  TemplatesRoute: TemplatesRoute,
+  CommunicationsOffersRoute: CommunicationsOffersRoute,
+  CommunicationsReceiptsRoute: CommunicationsReceiptsRoute,
+  CommunicationsRemindersRoute: CommunicationsRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
