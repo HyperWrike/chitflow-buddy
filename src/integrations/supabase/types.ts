@@ -14,6 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          record_id: string | null
+          table_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          record_id?: string | null
+          table_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          audience: string
+          audience_ids: string[] | null
+          created_at: string
+          created_by: string | null
+          id: string
+          image_url: string | null
+          message: string
+          name: string
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          total_delivered: number
+          total_failed: number
+          total_read: number
+          total_sent: number
+        }
+        Insert: {
+          audience?: string
+          audience_ids?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          message?: string
+          name: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          total_delivered?: number
+          total_failed?: number
+          total_read?: number
+          total_sent?: number
+        }
+        Update: {
+          audience?: string
+          audience_ids?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          message?: string
+          name?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          total_delivered?: number
+          total_failed?: number
+          total_read?: number
+          total_sent?: number
+        }
+        Relationships: []
+      }
       chit_groups: {
         Row: {
           agreement_no: string | null
@@ -59,41 +143,110 @@ export type Database = {
         }
         Relationships: []
       }
+      company_settings: {
+        Row: {
+          address: string
+          auction_time: string
+          auto_send_enabled: boolean
+          company_name: string
+          days_before_auction: number
+          id: string
+          logo_url: string | null
+          phone: string
+          scheduler_time: string
+          tagline: string
+          updated_at: string
+          wapi_key: string | null
+          wapi_provider: string
+          wapi_sender: string | null
+          whatsapp_no: string
+        }
+        Insert: {
+          address?: string
+          auction_time?: string
+          auto_send_enabled?: boolean
+          company_name?: string
+          days_before_auction?: number
+          id?: string
+          logo_url?: string | null
+          phone?: string
+          scheduler_time?: string
+          tagline?: string
+          updated_at?: string
+          wapi_key?: string | null
+          wapi_provider?: string
+          wapi_sender?: string | null
+          whatsapp_no?: string
+        }
+        Update: {
+          address?: string
+          auction_time?: string
+          auto_send_enabled?: boolean
+          company_name?: string
+          days_before_auction?: number
+          id?: string
+          logo_url?: string | null
+          phone?: string
+          scheduler_time?: string
+          tagline?: string
+          updated_at?: string
+          wapi_key?: string | null
+          wapi_provider?: string
+          wapi_sender?: string | null
+          whatsapp_no?: string
+        }
+        Relationships: []
+      }
       dispatch_log: {
         Row: {
           attempt_count: number
+          campaign_id: string | null
           created_at: string
+          delivered_at: string | null
+          file_path: string | null
           id: string
           last_error: string | null
           month: string
+          read_at: string | null
           sent_at: string | null
           statement_image_path: string | null
           status: string
           subscriber_id: string
+          type: string
           whatsapp_number: string
         }
         Insert: {
           attempt_count?: number
+          campaign_id?: string | null
           created_at?: string
+          delivered_at?: string | null
+          file_path?: string | null
           id?: string
           last_error?: string | null
           month: string
+          read_at?: string | null
           sent_at?: string | null
           statement_image_path?: string | null
           status?: string
           subscriber_id: string
+          type?: string
           whatsapp_number: string
         }
         Update: {
           attempt_count?: number
+          campaign_id?: string | null
           created_at?: string
+          delivered_at?: string | null
+          file_path?: string | null
           id?: string
           last_error?: string | null
           month?: string
+          read_at?: string | null
           sent_at?: string | null
           statement_image_path?: string | null
           status?: string
           subscriber_id?: string
+          type?: string
           whatsapp_number?: string
         }
         Relationships: [
@@ -114,6 +267,12 @@ export type Database = {
           id: string
           manual_override: boolean
           monthly_entry_id: string
+          override_reason: string | null
+          paid: boolean
+          paid_amount: number | null
+          paid_at: string | null
+          payment_mode: string | null
+          payment_ref: string | null
           previous_bid: number | null
           share_of_discount: number
           subscription_id: string
@@ -125,6 +284,12 @@ export type Database = {
           id?: string
           manual_override?: boolean
           monthly_entry_id: string
+          override_reason?: string | null
+          paid?: boolean
+          paid_amount?: number | null
+          paid_at?: string | null
+          payment_mode?: string | null
+          payment_ref?: string | null
           previous_bid?: number | null
           share_of_discount?: number
           subscription_id: string
@@ -136,6 +301,12 @@ export type Database = {
           id?: string
           manual_override?: boolean
           monthly_entry_id?: string
+          override_reason?: string | null
+          paid?: boolean
+          paid_amount?: number | null
+          paid_at?: string | null
+          payment_mode?: string | null
+          payment_ref?: string | null
           previous_bid?: number | null
           share_of_discount?: number
           subscription_id?: string
@@ -324,6 +495,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      templates: {
+        Row: {
+          color_scheme: string
+          created_at: string
+          footer_text: string
+          header_text: string | null
+          html_content: string
+          id: string
+          is_default: boolean
+          name: string
+          show_diagram: boolean
+          show_logo: boolean
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          color_scheme?: string
+          created_at?: string
+          footer_text?: string
+          header_text?: string | null
+          html_content?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          show_diagram?: boolean
+          show_logo?: boolean
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          color_scheme?: string
+          created_at?: string
+          footer_text?: string
+          header_text?: string | null
+          html_content?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          show_diagram?: boolean
+          show_logo?: boolean
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
