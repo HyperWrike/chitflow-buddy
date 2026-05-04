@@ -13,7 +13,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/subscribers")({
   component: SubscribersPage,
@@ -30,7 +29,7 @@ function SubscribersPage() {
 
 function Subscribers() {
   const [search, setSearch] = useState("");
-  const { isAdmin } = useAuth();
+  const qc = useQueryClient();
 
   // Subscribe to real-time changes
   React.useEffect(() => {
@@ -86,7 +85,7 @@ function Subscribers() {
           <h1 className="text-3xl font-bold tracking-tight">Subscribers</h1>
           <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} total</p>
         </div>
-        {isAdmin && <SubscriberDialog />}
+        <SubscriberDialog />
       </div>
 
       <div className="relative max-w-md">
@@ -98,6 +97,22 @@ function Subscribers() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+
+      {!list.isLoading && (list.data?.length ?? 0) === 0 && (
+        <Card className="border-dashed border-muted-foreground/30 bg-muted/20 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-foreground">No subscriber data yet</div>
+              <p className="text-sm text-muted-foreground">
+                The database is empty right now. Open ChitSync inside the app to load sample people and test the workflow.
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/chitsync">Open ChitSync</Link>
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -143,7 +158,7 @@ function Subscribers() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {isAdmin && <SubscriberDialog existing={s} />}
+                    <SubscriberDialog existing={s} />
                   </td>
                 </tr>
               ))}

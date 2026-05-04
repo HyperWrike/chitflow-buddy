@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import React from "react";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
-import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/groups")({
   component: GroupsPage,
@@ -29,7 +28,6 @@ function GroupsPage() {
 
 function Groups() {
   const [search, setSearch] = useState("");
-  const { isAdmin } = useAuth();
   const qc = useQueryClient();
 
   React.useEffect(() => {
@@ -66,7 +64,7 @@ function Groups() {
           <h1 className="text-3xl font-bold">Chit Groups</h1>
           <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} groups</p>
         </div>
-        {isAdmin && <GroupDialog />}
+        <GroupDialog />
       </div>
 
       <div className="relative max-w-md">
@@ -110,7 +108,7 @@ function Groups() {
                   <td className="px-4 py-3">Day {g.auction_day}{g.auction_time ? ` · ${g.auction_time}` : ""}</td>
                   <td className="px-4 py-3 text-right">{g.commission_rate}%</td>
                   <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${g.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{g.status}</span></td>
-                  <td className="px-4 py-3 text-right">{isAdmin && <GroupDialog existing={g} />}</td>
+                  <td className="px-4 py-3 text-right"><GroupDialog existing={g} /></td>
                 </tr>
               ))}
             </tbody>

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Crown,
   Menu,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -59,6 +60,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/communications/receipts": "Receipts",
   "/templates": "Templates",
   "/settings": "Settings",
+  "/chitsync": "ChitSync",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -175,19 +177,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">
           Tools
         </div>
-        <a
-          href="/chitsync.html"
-          target="_blank"
-          rel="noopener"
+        <Link
+          to="/chitsync"
           onClick={() => setMobileOpen(false)}
           className="group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium text-white/70 transition-all hover:bg-white/5 hover:text-white"
         >
-          <Crown className="h-[17px] w-[17px] shrink-0" />
+          <Sparkles className="h-[17px] w-[17px] shrink-0" />
           <span className="flex-1">ChitSync (AI)</span>
           <span className="rounded-full bg-[var(--gold)] px-1.5 py-0.5 text-[9px] font-semibold leading-none text-[var(--navy)]">
             NEW
           </span>
-        </a>
+        </Link>
       </nav>
 
       {/* User */}

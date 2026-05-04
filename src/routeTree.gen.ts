@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as DispatchRouteImport } from './routes/dispatch'
 import { Route as DataEntryRouteImport } from './routes/data-entry'
+import { Route as ChitsyncRouteImport } from './routes/chitsync'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscribersIdRouteImport } from './routes/subscribers.$id'
@@ -59,6 +60,11 @@ const DataEntryRoute = DataEntryRouteImport.update({
   path: '/data-entry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChitsyncRoute = ChitsyncRouteImport.update({
+  id: '/chitsync',
+  path: '/chitsync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiRoute = AiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -98,6 +104,7 @@ const CommunicationsOffersRoute = CommunicationsOffersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/chitsync': typeof ChitsyncRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/chitsync': typeof ChitsyncRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/chitsync': typeof ChitsyncRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai'
+    | '/chitsync'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ai'
+    | '/chitsync'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ai'
+    | '/chitsync'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiRoute: typeof AiRoute
+  ChitsyncRoute: typeof ChitsyncRoute
   DataEntryRoute: typeof DataEntryRoute
   DispatchRoute: typeof DispatchRoute
   GroupsRoute: typeof GroupsRouteWithChildren
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/data-entry'
       fullPath: '/data-entry'
       preLoaderRoute: typeof DataEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chitsync': {
+      id: '/chitsync'
+      path: '/chitsync'
+      fullPath: '/chitsync'
+      preLoaderRoute: typeof ChitsyncRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ai': {
@@ -339,6 +359,7 @@ const SubscribersRouteWithChildren = SubscribersRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiRoute: AiRoute,
+  ChitsyncRoute: ChitsyncRoute,
   DataEntryRoute: DataEntryRoute,
   DispatchRoute: DispatchRoute,
   GroupsRoute: GroupsRouteWithChildren,

@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
-import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/groups/$id")({
   component: GroupDetailPage,
@@ -24,7 +23,6 @@ function GroupDetailPage() {
 
 function Detail() {
   const { id } = Route.useParams();
-  const { isAdmin } = useAuth();
   const qc = useQueryClient();
 
   // Subscribe to real-time changes
@@ -91,7 +89,7 @@ function Detail() {
           <h1 className="text-3xl font-bold font-mono">{grp.data.group_code}</h1>
           <p className="text-sm text-muted-foreground">Agreement {grp.data.agreement_no ?? "—"}</p>
         </div>
-        {isAdmin && <AddMemberDialog groupId={id} />}
+        <AddMemberDialog groupId={id} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -113,7 +111,7 @@ function Detail() {
               <th className="px-4 py-2 text-left">Name on Chit</th>
               <th className="px-4 py-2 text-right">Seats</th>
               <th className="px-4 py-2 text-left">Prized</th>
-              {isAdmin && <th className="px-4 py-2"></th>}
+              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -133,11 +131,9 @@ function Detail() {
                 <td className="px-4 py-3">
                   {m.prized ? <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-semibold text-gold-foreground">Prized {m.prized_month ?? ""}</span> : <span className="text-xs text-muted-foreground">No</span>}
                 </td>
-                {isAdmin && (
-                  <td className="px-4 py-3 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => remove(m.id)}><Trash2 className="h-4 w-4" /></Button>
-                  </td>
-                )}
+                <td className="px-4 py-3 text-right">
+                  <Button variant="ghost" size="sm" onClick={() => remove(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                </td>
               </tr>
             ))}
           </tbody>
