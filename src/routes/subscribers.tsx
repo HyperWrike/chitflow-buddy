@@ -5,7 +5,7 @@ import { db, type Subscriber } from "@/lib/db-types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Plus, Search, Pencil } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -32,12 +32,40 @@ function Subscribers() {
   const [search, setSearch] = useState("");
   const { isAdmin } = useAuth();
 
+  // Subscribe to real-time changes
+  React.useEffect(() => {
+    const channel = db.channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscribers' },
+        () => qc.invalidateQueries({ queryKey: ['subscribers'] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions' },
+        () => qc.invalidateQueries({ queryKey: ['subscribers'] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chit_groups' },
+        () => qc.invalidateQueries({ queryKey: ['subscribers'] })
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, [qc]);
+
   const list = useQuery({
     queryKey: ["subscribers"],
     queryFn: async () => {
-      const { data, error } = await db.from("subscribers").select("*").order("name");
+      const { data, error } = await db
+        .from("subscribers")
+        .select("*, subscriptions(id, chit_groups(group_code))")
+        .order("name");
       if (error) throw error;
-      return data as Subscriber[];
+      return data as (Subscriber & { subscriptions: { id: string, chit_groups: { group_code: string } }[] })[];
     },
   });
 
@@ -79,7 +107,7 @@ function Subscribers() {
                 <th className="px-4 py-3 text-left">Code</th>
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">WhatsApp</th>
-                <th className="px-4 py-3 text-left">City</th>
+                <th className="px-4 py-3 text-left">Groups</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -100,7 +128,15 @@ function Subscribers() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{s.whatsapp_number}</td>
-                  <td className="px-4 py-3">{s.city}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {s.subscriptions?.map(sub => (
+                         <span key={sub.id} className="rounded-full bg-muted/60 px-2 py-0.5 text-xs">
+                           {sub.chit_groups.group_code}
+                         </span>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${s.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
                       {s.active ? "Active" : "Inactive"}

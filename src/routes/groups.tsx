@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import React from "react";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
@@ -29,6 +30,21 @@ function GroupsPage() {
 function Groups() {
   const [search, setSearch] = useState("");
   const { isAdmin } = useAuth();
+  const qc = useQueryClient();
+
+  React.useEffect(() => {
+    const channel = db.channel(`groups-changes`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chit_groups' },
+        () => qc.invalidateQueries({ queryKey: ["groups"] })
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, [qc]);
 
   const list = useQuery({
     queryKey: ["groups"],

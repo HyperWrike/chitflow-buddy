@@ -5,7 +5,7 @@ import { db } from "@/lib/db-types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,26 @@ function Detail() {
   const { id } = Route.useParams();
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
+
+  // Subscribe to real-time changes
+  React.useEffect(() => {
+    const channel = db.channel(`group-changes-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions', filter: `group_id=eq.${id}` },
+        () => qc.invalidateQueries({ queryKey: ["group-members", id] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chit_groups', filter: `id=eq.${id}` },
+        () => qc.invalidateQueries({ queryKey: ["group", id] })
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, [qc, id]);
 
   const grp = useQuery({
     queryKey: ["group", id],

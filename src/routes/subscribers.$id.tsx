@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/db-types";
 import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/format";
 
@@ -22,6 +23,27 @@ function SubscriberDetailPage() {
 
 function Detail() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
+
+  // Subscribe to real-time changes
+  React.useEffect(() => {
+    const channel = db.channel(`subscriber-changes-${id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions', filter: `subscriber_id=eq.${id}` },
+        () => qc.invalidateQueries({ queryKey: ["subscriptions-for-subscriber", id] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscribers', filter: `id=eq.${id}` },
+        () => qc.invalidateQueries({ queryKey: ["subscriber", id] })
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, [qc, id]);
 
   const sub = useQuery({
     queryKey: ["subscriber", id],
