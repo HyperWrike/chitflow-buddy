@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as GroupsRouteImport } from './routes/groups'
 import { Route as DispatchRouteImport } from './routes/dispatch'
 import { Route as DataEntryRouteImport } from './routes/data-entry'
+import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscribersIdRouteImport } from './routes/subscribers.$id'
 import { Route as GroupsIdRouteImport } from './routes/groups.$id'
@@ -58,6 +59,11 @@ const DataEntryRoute = DataEntryRouteImport.update({
   path: '/data-entry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiRoute = AiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -91,6 +97,7 @@ const CommunicationsOffersRoute = CommunicationsOffersRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -122,6 +130,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/data-entry': typeof DataEntryRoute
   '/dispatch': typeof DispatchRoute
   '/groups': typeof GroupsRouteWithChildren
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai'
     | '/data-entry'
     | '/dispatch'
     | '/groups'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiRoute: typeof AiRoute
   DataEntryRoute: typeof DataEntryRoute
   DispatchRoute: typeof DispatchRoute
   GroupsRoute: typeof GroupsRouteWithChildren
@@ -246,6 +259,13 @@ declare module '@tanstack/react-router' {
       path: '/data-entry'
       fullPath: '/data-entry'
       preLoaderRoute: typeof DataEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai': {
+      id: '/ai'
+      path: '/ai'
+      fullPath: '/ai'
+      preLoaderRoute: typeof AiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -318,6 +338,7 @@ const SubscribersRouteWithChildren = SubscribersRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiRoute: AiRoute,
   DataEntryRoute: DataEntryRoute,
   DispatchRoute: DispatchRoute,
   GroupsRoute: GroupsRouteWithChildren,

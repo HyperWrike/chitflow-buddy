@@ -172,6 +172,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <NavSection items={NAV_COMM} label="Communications" />
         <div className="my-3 h-px bg-white/5" />
         <NavSection items={NAV_FOOTER} />
+        <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">
+          Tools
+        </div>
+        <a
+          href="/chitsync.html"
+          target="_blank"
+          rel="noopener"
+          onClick={() => setMobileOpen(false)}
+          className="group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13.5px] font-medium text-white/70 transition-all hover:bg-white/5 hover:text-white"
+        >
+          <Crown className="h-[17px] w-[17px] shrink-0" />
+          <span className="flex-1">ChitSync (AI)</span>
+          <span className="rounded-full bg-[var(--gold)] px-1.5 py-0.5 text-[9px] font-semibold leading-none text-[var(--navy)]">
+            NEW
+          </span>
+        </a>
       </nav>
 
       {/* User */}

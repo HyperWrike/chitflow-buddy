@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1280" />
+<title>ChitSync</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --navy:#0d1b2a; --navy-2:#142a3f; --navy-3:#1d3a55;
+    --saffron:#e8871a; --saffron-2:#c9710f; --saffron-soft:#fff1de;
+    --cream:#fdf6ec; --paper:#ffffff; --line:#e7dfd0; --line-2:#d8cdb6;
+    --text:#1a2434; --muted:#6b7585; --ok:#1f7a3a; --warn:#a14a00; --err:#a3261f;
+    --blue:#3a5fcd; --purple:#7b3aa6; --teal:#117c8a; --amber:#c98309; --coral:#c64a3b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--cream);color:var(--text);font-family:'Noto Sans',system-ui,sans-serif;font-size:14px;line-height:1.45}
+  h1,h2,h3,h4{font-family:'Noto Serif',serif;font-weight:700;margin:0}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit;font-size:14px}
+  a{color:var(--saffron-2);text-decoration:none}
+  .app{display:grid;grid-template-rows:56px 1fr;height:100vh}
+  .topbar{background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 20px;gap:18px;border-bottom:3px solid var(--saffron)}
+  .brand{display:flex;align-items:center;gap:10px;font-family:'Noto Serif',serif;font-weight:700;font-size:18px;letter-spacing:.3px}
+  .brand-mark{width:28px;height:28px;border-radius:6px;background:var(--saffron);display:grid;place-items:center;color:#fff;font-weight:700}
+  .tabs{display:flex;gap:4px;margin-left:24px}
+  .tab{background:transparent;border:0;color:#cdd6e4;padding:8px 16px;border-radius:8px;font-weight:600;font-size:13px;letter-spacing:.3px}
+  .tab.active{background:var(--navy-2);color:#fff;box-shadow:inset 0 -2px 0 var(--saffron)}
+  .tab:hover:not(.active){background:var(--navy-2);color:#fff}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .icon-btn{background:var(--navy-2);border:0;color:#fff;width:34px;height:34px;border-radius:8px;display:grid;place-items:center}
+  .icon-btn:hover{background:var(--navy-3)}
+  .api-pill{background:var(--navy-2);color:#cdd6e4;font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--navy-3)}
+  .api-pill.ok{color:#9bd9a8}
+  .api-pill.bad{color:#ffb8b1}
+  .page{overflow:auto;padding:24px 28px}
+  .panel{display:none}
+  .panel.active{display:block}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+  .card h3{font-size:16px;margin-bottom:10px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .muted{color:var(--muted)}
+  .stat{font-family:'Noto Serif',serif;font-size:22px;font-weight:700}
+  .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:180px;flex:1}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  .input,.select,.textarea{background:#fff;border:1px solid var(--line-2);border-radius:8px;padding:9px 10px;color:var(--text);outline:none}
+  .input:focus,.select:focus,.textarea:focus{border-color:var(--saffron);box-shadow:0 0 0 3px var(--saffron-soft)}
+  .textarea{min-height:74px;resize:vertical}
+  .btn{background:var(--saffron);color:#fff;border:0;padding:10px 16px;border-radius:8px;font-weight:600;letter-spacing:.3px}
+  .btn:hover{background:var(--saffron-2)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--line-2)}
+  .btn-ghost:hover{background:var(--cream)}
+  .btn-dark{background:var(--navy);color:#fff}
+  .btn-dark:hover{background:var(--navy-2)}
+  .btn-danger{background:var(--err);color:#fff}
+  .btn-sm{padding:6px 10px;font-size:12px}
+  .drop{border:2px dashed var(--line-2);border-radius:12px;padding:22px;text-align:center;background:#fffaf0;transition:.15s}
+  .drop.over{border-color:var(--saffron);background:var(--saffron-soft)}
+  .drop p{margin:6px 0;color:var(--muted)}
+  .file-meta{font-size:12px;color:var(--ok);margin-top:6px;font-weight:600}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)}
+  th{background:#faf3e6;color:var(--navy);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:0}
+  tr.expandable{cursor:pointer}
+  tr.expandable:hover td{background:#fffaf0}
+  tr.detail-row td{background:#fffaf0;border-top:1px dashed var(--line-2)}
+  .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff;margin-right:4px;letter-spacing:.4px}
+  .b-A{background:var(--blue)} .b-B{background:var(--purple)} .b-C{background:var(--teal)}
+  .b-D{background:var(--amber)} .b-E{background:var(--coral)}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#eef1f6;color:var(--navy);font-weight:600;font-size:12px}
+  .pill.ok{background:#e1f3e6;color:var(--ok)}
+  .pill.warn{background:#fff0d6;color:var(--warn)}
+  .pill.err{background:#fde6e3;color:var(--err)}
+  .code{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;background:#f3ecdb;padding:2px 6px;border-radius:4px;font-size:12px;color:var(--navy)}
+  .receipt{background:#fff;border:2px solid var(--navy);border-radius:6px;padding:0;max-width:520px;margin:14px 0;font-family:'Noto Sans',sans-serif}
+  .receipt .rh{background:var(--navy);color:#fff;padding:14px 18px}
+  .receipt .rh h2{font-size:18px;margin:0;color:#fff}
+  .receipt .rh .meta{font-size:11px;color:#cdd6e4;margin-top:4px}
+  .receipt .rb{padding:14px 18px}
+  .receipt .rb .kv{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px dashed var(--line)}
+  .receipt .rb .kv:last-child{border-bottom:0}
+  .receipt .amt{background:var(--saffron-soft);padding:10px 18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .receipt .amt .v{font-family:'Noto Serif',serif;font-size:22px;font-weight:700;color:var(--navy)}
+  .receipt .rf{padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:var(--muted)}
+  .receipt .sig{border-top:1px solid var(--text);padding-top:4px;width:140px;text-align:center}
+  .chat-wrap{display:grid;grid-template-columns:260px 1fr;gap:16px;height:calc(100vh - 56px - 48px)}
+  .chat-side{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto}
+  .chat-side h4{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.6px;margin-bottom:8px;font-family:'Noto Sans',sans-serif;font-weight:700}
+  .quick{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+  .quick button{text-align:left;background:#fffaf0;border:1px solid var(--line);color:var(--navy);padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500}
+  .quick button:hover{background:var(--saffron-soft);border-color:var(--saffron)}
+  .stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .stat-row:last-child{border-bottom:0}
+  .chat-main{display:grid;grid-template-rows:1fr auto;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .chat-msgs{padding:18px;overflow:auto;background:linear-gradient(#fffdf7,#fff)}
+  .msg{display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;max-width:760px}
+  .msg.user{flex-direction:row-reverse;margin-left:auto}
+  .msg .av{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px;flex-shrink:0}
+  .msg.user .av{background:var(--saffron)}
+  .bubble{padding:10px 14px;border-radius:14px;line-height:1.5;font-size:13.5px}
+  .msg.ai .bubble{background:#fff;border:1px solid var(--line);border-top-left-radius:4px;color:var(--text)}
+  .msg.user .bubble{background:var(--navy);color:#fff;border-top-right-radius:4px}
+  .bubble pre{background:#f3ecdb;padding:8px;border-radius:6px;overflow:auto;font-size:12px;margin:6px 0}
+  .bubble table{margin-top:8px}
+  .typing{display:inline-flex;gap:3px;padding:4px 0}
+  .typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bl 1s infinite}
+  .typing span:nth-child(2){animation-delay:.15s} .typing span:nth-child(3){animation-delay:.3s}
+  @keyframes bl{0%,80%,100%{opacity:.3} 40%{opacity:1}}
+  .chat-input{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);background:#fff}
+  .chat-input input{flex:1}
+  .ai-card{background:#fffaf0;border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13px}
+  .ai-card .h{font-weight:700;color:var(--navy);margin-bottom:4px}
+  .backdrop{position:fixed;inset:0;background:rgba(13,27,42,.55);display:none;align-items:center;justify-content:center;z-index:50}
+  .backdrop.show{display:flex}
+  .modal{background:#fff;border-radius:12px;width:520px;max-width:90vw;max-height:90vh;overflow:auto;border:1px solid var(--line)}
+  .modal h3{padding:16px 20px;border-bottom:1px solid var(--line);font-size:16px;background:#faf3e6}
+  .modal .body{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+  .modal .foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:#fafaf6}
+  .banner{background:#fff0d6;border:1px solid var(--line-2);color:var(--warn);padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+  .detail{padding:12px 14px;background:#fffaf0}
+  .detail .row{margin-bottom:10px}
+  .enrol-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+  .enrol-card .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .mapper{display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center;margin-top:10px}
+  .mapper label{font-size:12px;font-weight:600;color:var(--navy)}
+  @media print{
+    body * {visibility:hidden}
+    .receipt-print, .receipt-print *{visibility:visible}
+    .receipt-print{position:absolute;left:0;top:0;border:1px solid #000;width:100%;font-size:12pt;margin:1cm}
+    .receipt-print .rh{background:#fff !important;color:#000 !important;border-bottom:1px solid #000}
+    .receipt-print .rh h2,.receipt-print .rh .meta{color:#000 !important}
+    .receipt-print .amt{background:#fff !important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">C</div> ChitSync</div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="import">Import</button>
+      <button class="tab" data-tab="customers">Customers</button>
+      <button class="tab" data-tab="chat">AI Chat</button>
+    </nav>
+    <div class="top-right">
+      <span id="apiPill" class="api-pill bad">API key not set</span>
+      <button class="icon-btn" id="openSettings" title="Settings">&#9881;</button>
+    </div>
+  </header>
+  <main class="page">
+    <section class="panel active" id="panel-import">
+      <div id="importBanner"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>System 1 &mdash; CSV Upload</h3>
+          <p class="muted" style="font-size:12px;margin:0 0 10px">Typically Companies A, B, C exports.</p>
+          <div class="drop" id="drop1"><p>Drop CSV here or <a href="#" data-pick="1">browse</a></p>
+            <input type="file" id="file1" accept=".csv" hidden />
+            <div class="file-meta" id="meta1"></div>
+          </div>
+          <div id="map1"></div>
+        </div>
+        <div class="card">
+          <h3>System 2 &mdash; CSV Upload</h3>
+          <p class="muted" style="font-size:12px;margin:0 0 10px">Typically Companies D, E exports.</p>
+          <div class="drop" id="drop2"><p>Drop CSV here or <a href="#" data-pick="2">browse</a></p>
+            <input type="file" id="file2" accept=".csv" hidden />
+            <div class="file-meta" id="meta2"></div>
+          </div>
+          <div id="map2"></div>
+        </div>
+      </div>
+      <div style="margin:18px 0;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" id="runImport">Import &amp; Unify Data</button>
+        <button class="btn-ghost btn" id="loadSample">Load Sample Data</button>
+        <button class="btn-ghost btn" id="clearImport">Clear &amp; Re-import</button>
+      </div>
+      <div id="importResult"></div>
+    </section>
+    <section class="panel" id="panel-customers">
+      <div class="card" style="margin-bottom:16px">
+        <div class="row" style="align-items:flex-end">
+          <div class="field" style="flex:2">
+            <label>Search</label>
+            <input class="input" id="custSearch" placeholder="Name, phone, family code, internal code..."/>
+          </div>
+          <div class="field" style="max-width:180px">
+            <label>Company</label>
+            <select class="select" id="custFilter">
+              <option value="">All Companies</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+            </select>
+          </div>
+          <div class="field" style="max-width:160px">
+            <label>&nbsp;</label>
+            <button class="btn" id="addCustBtn">+ Add Customer</button>
+          </div>
+          <div class="field" style="max-width:140px">
+            <label>Total</label>
+            <div class="stat" id="custCount">0</div>
+          </div>
+        </div>
+        <div id="addCustForm" style="display:none;margin-top:14px;border-top:1px dashed var(--line-2);padding-top:14px"></div>
+      </div>
+      <div id="custList"></div>
+    </section>
+    <section class="panel" id="panel-chat">
+      <div class="chat-wrap">
+        <aside class="chat-side">
+          <h4>Quick Actions</h4>
+          <div class="quick" id="quickActions"></div>
+          <h4>Today</h4>
+          <div id="todayStats"></div>
+        </aside>
+        <div class="chat-main">
+          <div class="chat-msgs" id="chatMsgs"></div>
+          <div class="chat-input">
+            <input class="input" id="chatInput" placeholder="Type in plain English... e.g. 'receipt for ravi company b'"/>
+            <button class="btn" id="chatSend">Send</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="backdrop" id="settingsModal">
+  <div class="modal">
+    <h3>Settings</h3>
+    <div class="body">
+      <div class="field">
+        <label>AI Provider</label>
+        <select class="select" id="aiProvider">
+          <option value="groq">Groq (fast, free tier)</option>
+          <option value="anthropic">Anthropic (Claude)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <div style="display:flex;gap:6px">
+          <input class="input" id="apiKey" type="password" placeholder="gsk_... or sk-ant-..." style="flex:1"/>
+          <button class="btn-ghost btn btn-sm" id="toggleKey">Show</button>
+        </div>
+        <small class="muted">Stored only in this browser's localStorage. A Groq key is pre-loaded on first use.</small>
+      </div>
+      <div class="field"><label>Company Name (on receipts)</label><input class="input" id="setCoName" placeholder="Sri Lakshmi Chit Fund"/></div>
+      <div class="field"><label>Company Address</label><input class="input" id="setCoAddr" placeholder="Address shown on receipts"/></div>
+      <div class="field"><label>Company Phone</label><input class="input" id="setCoPhone" placeholder="+91..."/></div>
+      <div id="settingsSaved" class="pill ok" style="display:none">Saved &check;</div>
+    </div>
+    <div class="foot">
+      <button class="btn-ghost btn btn-danger" id="clearAll">Clear All Data</button>
+      <span style="flex:1"></span>
+      <button class="btn-ghost btn" id="closeSettings">Close</button>
+      <button class="btn" id="saveSettings">Save</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+const K = {
+  customers:'chitsync_customers', enrolments:'chitsync_enrolments',
+  txns:'chitsync_txns', receipts:'chitsync_receipts',
+  chat:'chitsync_chat', api:'chitsync_api_key', co:'chitsync_company',
+  provider:'chitsync_ai_provider'
+};
+const DEFAULT_GROQ_KEY = '';
+if (!localStorage.getItem(K.api)) localStorage.setItem(K.api, DEFAULT_GROQ_KEY);
+if (!localStorage.getItem(K.provider)) localStorage.setItem(K.provider, 'groq');
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ console.error('save',e); } };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Math.random().toString(36).slice(2)+Date.now());
+
+let CUST = load(K.customers, []);
+let ENR  = load(K.enrolments, []);
+let TXN  = load(K.txns, []);
+let RCT  = load(K.receipts, []);
+let CHAT = load(K.chat, []);
+let CO   = load(K.co, { name:'Sri Lakshmi Chit Fund', address:'Main Road, City', phone:'+91 90000 00000' });
+const persist = () => { save(K.customers,CUST); save(K.enrolments,ENR); save(K.txns,TXN); save(K.receipts,RCT); save(K.chat,CHAT); save(K.co,CO); };
+
+const RANK = { A:1, B:2, C:3, D:4, E:5 };
+const COS = ['A','B','C','D','E'];
+
+const normPhone = (p) => {
+  if (!p) return '';
+  let s = String(p).replace(/[^\d]/g,'');
+  if (s.startsWith('91') && s.length===12) s = s.slice(2);
+  if (s.startsWith('0') && s.length===11) s = s.slice(1);
+  return s;
+};
+const inr = (n) => {
+  if (n==null || isNaN(n)) return '₹0';
+  const s = Math.round(Number(n)).toString();
+  const neg = s.startsWith('-');
+  const x = neg ? s.slice(1) : s;
+  const last3 = x.slice(-3);
+  const rest = x.slice(0,-3);
+  const grouped = rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g,',') + ',' + last3 : last3;
+  return '₹' + (neg?'-':'') + grouped;
+};
+const fmtDate = (d) => {
+  const x = d ? new Date(d) : new Date();
+  return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+};
+const todayISO = () => new Date().toISOString().slice(0,10);
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const nextInternalCode = (company) => {
+  const list = ENR.filter(e => e.company === company)
+    .map(e => parseInt((e.internal_code||'').split('-')[1]||'0',10))
+    .filter(n => !isNaN(n));
+  const next = (list.length ? Math.max(...list) : 0) + 1;
+  return company + '-' + String(next).padStart(4,'0');
+};
+const nextReceiptNumber = (company) => {
+  const yr = new Date().getFullYear();
+  const list = RCT.filter(r => (r.receipt_number||'').startsWith(company+'-'+yr+'-'))
+    .map(r => parseInt(r.receipt_number.split('-')[2]||'0',10))
+    .filter(n => !isNaN(n));
+  const next = (list.length ? Math.max(...list) : 0) + 1;
+  return company + '-' + yr + '-' + String(next).padStart(5,'0');
+};
+
+function computeFamilyCode(customer_id) {
+  const c = CUST.find(x => x.id === customer_id);
+  if (!c) return null;
+  let code = null;
+  if (c.linked_member_id) {
+    const linked = CUST.find(x => x.id === c.linked_member_id);
+    if (linked) {
+      const linkedEnrs = ENR.filter(e => e.customer_id === linked.id);
+      if (linkedEnrs.length) {
+        linkedEnrs.sort((a,b)=> (RANK[a.company]||9)-(RANK[b.company]||9));
+        code = linkedEnrs[0].internal_code;
+      } else if (linked.family_code) {
+        code = linked.family_code;
+      }
+    }
+  }
+  if (!code) {
+    const own = ENR.filter(e => e.customer_id === c.id);
+    if (own.length) {
+      own.sort((a,b)=> (RANK[a.company]||9)-(RANK[b.company]||9));
+      code = own[0].internal_code;
+    }
+  }
+  if (!code) return null;
+  c.family_code = code;
+  ENR.forEach(e => { if (e.customer_id === c.id) e.family_code = code; });
+  return code;
+}
+
+document.querySelectorAll('.tab').forEach(b => {
+  b.addEventListener('click', () => switchTab(b.dataset.tab));
+});
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+name));
+  if (name==='customers') renderCustomers();
+  if (name==='chat') { renderChat(); renderTodayStats(); }
+}
+
+const apiKey = () => localStorage.getItem(K.api) || '';
+const aiProvider = () => localStorage.getItem(K.provider) || 'groq';
+function refreshApiPill(){
+  const p = document.getElementById('apiPill');
+  if (apiKey()) { p.className='api-pill ok'; p.textContent = aiProvider()==='groq' ? 'Groq · ready ✓' : 'Claude · ready ✓'; }
+  else { p.className='api-pill bad'; p.textContent='API key not set'; }
+}
+document.getElementById('openSettings').onclick = () => {
+  document.getElementById('apiKey').value = apiKey();
+  document.getElementById('aiProvider').value = aiProvider();
+  document.getElementById('setCoName').value = CO.name||'';
+  document.getElementById('setCoAddr').value = CO.address||'';
+  document.getElementById('setCoPhone').value = CO.phone||'';
+  document.getElementById('settingsModal').classList.add('show');
+};
+document.getElementById('closeSettings').onclick = () => document.getElementById('settingsModal').classList.remove('show');
+document.getElementById('toggleKey').onclick = () => {
+  const i = document.getElementById('apiKey');
+  i.type = i.type === 'password' ? 'text' : 'password';
+};
+document.getElementById('saveSettings').onclick = () => {
+  localStorage.setItem(K.api, document.getElementById('apiKey').value.trim());
+  localStorage.setItem(K.provider, document.getElementById('aiProvider').value);
+  CO = {
+    name: document.getElementById('setCoName').value.trim() || 'Sri Lakshmi Chit Fund',
+    address: document.getElementById('setCoAddr').value.trim(),
+    phone: document.getElementById('setCoPhone').value.trim()
+  };
+  save(K.co, CO);
+  refreshApiPill();
+  showApiBannerIfMissing();
+  const s = document.getElementById('settingsSaved'); s.style.display='inline-block';
+  setTimeout(()=>s.style.display='none', 1600);
+};
+document.getElementById('clearAll').onclick = () => {
+  if (!confirm('Delete ALL customers, enrolments, transactions, receipts and chat history?')) return;
+  CUST=[]; ENR=[]; TXN=[]; RCT=[]; CHAT=[]; persist();
+  document.getElementById('settingsModal').classList.remove('show');
+  switchTab('import'); renderImportResult(null);
+  alert('All data cleared.');
+};
+
+const SRC = { 1:{file:null, rows:null, headers:[], map:{}}, 2:{file:null, rows:null, headers:[], map:{}} };
+const FIELDS = [
+  {k:'name',   label:'Name'},
+  {k:'phone',  label:'Phone'},
+  {k:'company',label:'Company (or fixed value A-E)', allowFixed:true},
+  {k:'code',   label:'Internal Code'},
+  {k:'chit',   label:'Chit Amount'},
+  {k:'balance',label:'Balance'},
+];
+
+function bindUpload(idx){
+  const drop = document.getElementById('drop'+idx);
+  const input = document.getElementById('file'+idx);
+  drop.querySelector('a[data-pick]').onclick = (e)=>{ e.preventDefault(); input.click(); };
+  ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('over');}));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files[0]) handleFile(idx, e.dataTransfer.files[0]); });
+  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(idx, e.target.files[0]); });
+}
+function handleFile(idx, file){
+  Papa.parse(file, { header:true, skipEmptyLines:true, complete: (res) => {
+    SRC[idx].file = file;
+    SRC[idx].rows = res.data;
+    SRC[idx].headers = res.meta.fields || [];
+    SRC[idx].map = guessMap(SRC[idx].headers);
+    document.getElementById('meta'+idx).textContent = file.name + ' — ' + res.data.length + ' rows';
+    renderMapper(idx);
+  }, error: (e) => { alert('CSV parse error: '+e.message); } });
+}
+function guessMap(headers){
+  const m = {};
+  const find = (...needles) => headers.find(h => needles.some(n => h.toLowerCase().includes(n))) || '';
+  m.name = find('name','customer');
+  m.phone = find('phone','mobile','contact');
+  m.company = find('company','branch','office');
+  m.code = find('code','id','member');
+  m.chit = find('chit','amount','principal');
+  m.balance = find('balance','due','outstanding');
+  return m;
+}
+function el(tag, attrs, ...children){
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    if (k==='class') e.className = attrs[k];
+    else if (k==='style') e.style.cssText = attrs[k];
+    else if (k.startsWith('on')) e[k] = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of children){
+    if (c==null) continue;
+    if (Array.isArray(c)) c.forEach(x => x!=null && e.append(x.nodeType?x:document.createTextNode(String(x))));
+    else e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+function renderMapper(idx){
+  const wrap = document.getElementById('map'+idx);
+  wrap.replaceChildren();
+  const headers = SRC[idx].headers;
+  const cont = el('div',{style:'margin-top:12px;border-top:1px dashed var(--line-2);padding-top:10px'});
+  cont.append(el('div',{class:'label'},'Column Mapping'));
+  FIELDS.forEach(f => {
+    const row = el('div',{class:'mapper'});
+    row.append(el('label',null,f.label));
+    const sub = el('div',{style:'display:flex;gap:6px'});
+    const sel = el('select',{class:'select','data-field':f.k});
+    sel.append(el('option',{value:''},'— select column —'));
+    headers.forEach(h => sel.append(el('option',{value:h},h)));
+    sel.value = SRC[idx].map[f.k] || '';
+    sel.onchange = () => SRC[idx].map[f.k] = sel.value;
+    sub.append(sel);
+    if (f.allowFixed){
+      const inp = el('input',{class:'input','data-fixed':f.k,placeholder:'or fixed (A-E)',style:'max-width:100px'});
+      inp.oninput = () => SRC[idx].map['_fixed_'+f.k] = inp.value.trim().toUpperCase();
+      sub.append(inp);
+    }
+    row.append(sub); cont.append(row);
+  });
+  const btnRow = el('div',{style:'margin-top:10px'});
+  const pBtn = el('button',{class:'btn-ghost btn btn-sm', onclick:()=>previewRows(idx)},'Preview first 5 rows');
+  btnRow.append(pBtn); cont.append(btnRow);
+  cont.append(el('div',{id:'preview'+idx,style:'margin-top:10px'}));
+  wrap.append(cont);
+}
+function rowVal(row, mapKey, src){
+  const fixed = src.map['_fixed_'+mapKey];
+  if (fixed && (mapKey==='company')) return fixed;
+  const col = src.map[mapKey];
+  return col ? row[col] : '';
+}
+function previewRows(idx){
+  const src = SRC[idx]; if (!src.rows) return;
+  const sample = src.rows.slice(0,5);
+  const tbl = el('table');
+  const thead = el('thead'); const trh = el('tr');
+  FIELDS.forEach(f => trh.append(el('th',null,f.label)));
+  thead.append(trh); tbl.append(thead);
+  const tbody = el('tbody');
+  sample.forEach(r => {
+    const tr = el('tr');
+    FIELDS.forEach(f => tr.append(el('td',null,String(rowVal(r,f.k,src)||''))));
+    tbody.append(tr);
+  });
+  tbl.append(tbody);
+  const out = document.getElementById('preview'+idx);
+  out.replaceChildren(tbl);
+}
+
+document.getElementById('runImport').onclick = runImport;
+document.getElementById('clearImport').onclick = () => {
+  if (!confirm('Wipe customers, enrolments, transactions and receipts?')) return;
+  CUST=[]; ENR=[]; TXN=[]; RCT=[]; persist(); renderImportResult({cleared:true});
+};
+document.getElementById('loadSample').onclick = () => { loadSample(); renderImportResult({sample:true}); };
+
+function runImport(){
+  const all = [];
+  for (const idx of [1,2]) {
+    const src = SRC[idx]; if (!src.rows) continue;
+    src.rows.forEach(r => all.push({
+      name: String(rowVal(r,'name',src)||'').trim(),
+      phone: normPhone(rowVal(r,'phone',src)),
+      company: String(rowVal(r,'company',src)||'').trim().toUpperCase(),
+      code: String(rowVal(r,'code',src)||'').trim(),
+      chit: Number(String(rowVal(r,'chit',src)||'0').replace(/[^0-9.]/g,''))||0,
+      balance: Number(String(rowVal(r,'balance',src)||'0').replace(/[^0-9.]/g,''))||0,
+      source: 'system'+idx
+    }));
+  }
+  if (!all.length) { alert('No rows. Upload at least one CSV.'); return; }
+  let matched=0, created=0, enrCreated=0;
+  all.forEach(r => {
+    if (!r.name || !r.phone || !COS.includes(r.company)) return;
+    let cust = CUST.find(c => c.phone === r.phone);
+    if (cust) {
+      matched++;
+    } else {
+      cust = { id:uid(), name:r.name, phone:r.phone, phone2:'', address:'',
+        family_code:null, linked_member_id:null, source:r.source, created_at:new Date().toISOString() };
+      CUST.push(cust); created++;
+    }
+    const exists = ENR.find(e => e.customer_id===cust.id && e.company===r.company);
+    if (!exists) {
+      const code = r.code || nextInternalCode(r.company);
+      ENR.push({
+        id:uid(), customer_id:cust.id, company:r.company, internal_code:code, family_code:null,
+        chit_amount:r.chit||0, duration_months:20, monthly_installment: r.chit ? Math.round(r.chit/20):0,
+        start_date: todayISO(), status:'active', is_new_customer:false, created_at:new Date().toISOString()
+      });
+      enrCreated++;
+    }
+  });
+  CUST.forEach(c => computeFamilyCode(c.id));
+  persist();
+  renderImportResult({ total: CUST.length, matched, created, enrCreated });
+}
+
+function renderImportResult(info){
+  const div = document.getElementById('importResult');
+  div.replaceChildren();
+  if (!info) return;
+  if (info.cleared) { div.append(el('div',{class:'banner'},'All data cleared.')); return; }
+  if (info.sample) info = { total: CUST.length, matched: 0, created: CUST.length, enrCreated: ENR.length };
+  const card = el('div',{class:'card'});
+  card.append(el('h3',null,'Import Summary'));
+  const g1 = el('div',{class:'grid-3',style:'margin:10px 0'});
+  const stat = (label, val) => { const d=el('div'); d.append(el('div',{class:'label'},label)); d.append(el('div',{class:'stat'},String(val))); return d; };
+  g1.append(stat('Total Customers', CUST.length), stat('Matched (existing)', info.matched||0), stat('New Records Created', info.created||0));
+  card.append(g1);
+  const g2 = el('div',{class:'grid-3',style:'margin-bottom:10px'});
+  g2.append(stat('Enrolments Created', info.enrCreated||0), stat('Total Enrolments', ENR.length), stat('Companies in use', [...new Set(ENR.map(e=>e.company))].sort().join(' ')||'—'));
+  card.append(g2);
+  const actRow = el('div',{style:'display:flex;gap:8px;margin-bottom:10px'});
+  actRow.append(el('button',{class:'btn',onclick:()=>document.querySelector('[data-tab=customers]').click()},'Go to Customers →'));
+  card.append(actRow);
+  card.append(el('div',{class:'label'},'Preview (first 20)'));
+  const scroll = el('div',{class:'scroll',style:'margin-top:6px'});
+  const tbl = el('table');
+  const head = el('thead'); const hr = el('tr');
+  ['Name','Phone','Companies','Internal Codes','Family Code','Status'].forEach(h => hr.append(el('th',null,h)));
+  head.append(hr); tbl.append(head);
+  const body = el('tbody');
+  CUST.slice(0,20).forEach(c => {
+    const en = ENR.filter(e=>e.customer_id===c.id);
+    const tr = el('tr');
+    tr.append(el('td',null,c.name), el('td',null,c.phone));
+    const tdC = el('td');
+    en.forEach(e => tdC.append(el('span',{class:'badge b-'+e.company},e.company)));
+    tr.append(tdC);
+    const tdK = el('td');
+    en.forEach((e,i) => { if(i)tdK.append(' '); tdK.append(el('span',{class:'code'},e.internal_code)); });
+    tr.append(tdK);
+    const tdF = el('td'); tdF.append(el('span',{class:'code'},c.family_code||'—')); tr.append(tdF);
+    const tdS = el('td'); tdS.append(el('span',{class:'pill ok'},'active')); tr.append(tdS);
+    body.append(tr);
+  });
+  tbl.append(body); scroll.append(tbl); card.append(scroll);
+  div.append(card);
+}
+
+bindUpload(1); bindUpload(2);
+
+let expandedCustId = null;
+function renderCustomers(){
+  document.getElementById('custCount').textContent = CUST.length;
+  const q = document.getElementById('custSearch').value.trim().toLowerCase();
+  const cf = document.getElementById('custFilter').value;
+  const list = CUST.filter(c => {
+    if (cf) {
+      const hasCo = ENR.some(e => e.customer_id===c.id && e.company===cf);
+      if (!hasCo) return false;
+    }
+    if (!q) return true;
+    if (c.name.toLowerCase().includes(q)) return true;
+    if (c.phone.includes(q)) return true;
+    if ((c.family_code||'').toLowerCase().includes(q)) return true;
+    return ENR.some(e => e.customer_id===c.id && e.internal_code.toLowerCase().includes(q));
+  });
+  const wrap = document.getElementById('custList');
+  wrap.replaceChildren();
+  const tbl = el('table');
+  const thead = el('thead'); const hr = el('tr');
+  ['Name','Phone','Family Code','Companies','Internal Codes','Linked Member','Actions'].forEach(h => hr.append(el('th',null,h)));
+  thead.append(hr); tbl.append(thead);
+  const tbody = el('tbody');
+  if (!list.length){
+    const tr = el('tr'); const td = el('td',{colspan:'7',style:'text-align:center;color:var(--muted);padding:24px'},'No customers yet. Use Import or Add Customer.');
+    tr.append(td); tbody.append(tr);
+  } else {
+    list.forEach(c => {
+      const en = ENR.filter(e=>e.customer_id===c.id);
+      const linked = c.linked_member_id ? CUST.find(x=>x.id===c.linked_member_id) : null;
+      const tr = el('tr',{class:'expandable','data-id':c.id});
+      tr.onclick = (e) => {
+        if (e.target.closest('button')) return;
+        expandedCustId = expandedCustId===c.id ? null : c.id;
+        renderCustomers();
+      };
+      tr.append(el('td',null,el('strong',null,c.name)));
+      tr.append(el('td',null,c.phone));
+      const tdF = el('td'); tdF.append(el('span',{class:'code'},c.family_code||'—')); tr.append(tdF);
+      const tdC = el('td');
+      if (en.length) en.forEach(e => tdC.append(el('span',{class:'badge b-'+e.company},e.company)));
+      else tdC.append(el('span',{class:'muted'},'—'));
+      tr.append(tdC);
+      const tdK = el('td');
+      if (en.length) en.forEach((e,i) => { if(i)tdK.append(' '); tdK.append(el('span',{class:'code'},e.internal_code)); });
+      else tdK.append(el('span',{class:'muted'},'—'));
+      tr.append(tdK);
+      const tdL = el('td'); if (linked) tdL.append(linked.name); else tdL.append(el('span',{class:'muted'},'—'));
+      tr.append(tdL);
+      const tdA = el('td');
+      tdA.append(el('button',{class:'btn-ghost btn btn-sm',onclick:(e)=>{e.stopPropagation();editCust(c.id);}},'Edit'),' ',
+                 el('button',{class:'btn-ghost btn btn-sm',onclick:(e)=>{e.stopPropagation();addEnrolPrompt(c.id);}},'+ Enrolment'),' ',
+                 el('button',{class:'btn-ghost btn btn-sm',onclick:(e)=>{e.stopPropagation();recordPayPrompt(c.id);}},'Pay'));
+      tr.append(tdA);
+      tbody.append(tr);
+      if (expandedCustId === c.id) {
+        const dr = el('tr',{class:'detail-row'});
+        const dt = el('td',{colspan:'7'});
+        dt.append(buildCustDetail(c, en));
+        dr.append(dt); tbody.append(dr);
+      }
+    });
+  }
+  tbl.append(tbody); wrap.append(tbl);
+}
+function buildCustDetail(c, en){
+  const wrap = el('div',{class:'detail'});
+  const g = el('div',{class:'grid-2',style:'margin-bottom:10px'});
+  const ad = el('div'); ad.append(el('div',{class:'label'},'Address')); ad.append(el('div',null,c.address||'—'));
+  const p2 = el('div'); p2.append(el('div',{class:'label'},'Secondary Phone')); p2.append(el('div',null,c.phone2||'—'));
+  g.append(ad,p2); wrap.append(g);
+  wrap.append(el('div',{class:'label'},'Enrolments'));
+  if (!en.length) wrap.append(el('div',{class:'muted'},'No enrolments.'));
+  else en.forEach(e => {
+    const card = el('div',{class:'enrol-card'});
+    const top = el('div',{class:'top'});
+    const left = el('div');
+    left.append(el('span',{class:'badge b-'+e.company},'Company '+e.company),' ',el('span',{class:'code'},e.internal_code));
+    top.append(left, el('span',{class:'pill '+(e.status==='active'?'ok':'warn')}, e.status));
+    card.append(top);
+    const r = el('div',{class:'row',style:'font-size:12px;color:var(--muted)'});
+    r.append(el('div',null,'Chit: '+inr(e.chit_amount)),
+             el('div',null,'Duration: '+e.duration_months+' mo'),
+             el('div',null,'Monthly: '+inr(e.monthly_installment)),
+             el('div',null,'Start: '+fmtDate(e.start_date)));
+    card.append(r);
+    wrap.append(card);
+  });
+  wrap.append(el('div',{class:'label',style:'margin-top:10px'},'Recent Transactions'));
+  const txns = TXN.filter(t=>t.customer_id===c.id).slice(-10).reverse();
+  if (!txns.length) wrap.append(el('div',{class:'muted'},'No transactions yet.'));
+  else {
+    const tbl = el('table',{style:'margin-top:6px'});
+    const th = el('thead'); const tr = el('tr');
+    ['Date','Type','Amount','Mode','Receipt'].forEach(h => tr.append(el('th',null,h)));
+    th.append(tr); tbl.append(th);
+    const tb = el('tbody');
+    txns.forEach(t => {
+      const r = RCT.find(x=>x.id===t.receipt_id);
+      const row = el('tr');
+      row.append(el('td',null,fmtDate(t.date)),el('td',null,t.type),el('td',null,inr(t.amount)),el('td',null,t.payment_mode));
+      const tdR = el('td'); tdR.append(el('span',{class:'code'},(r&&r.receipt_number)||'—')); row.append(tdR);
+      tb.append(row);
+    });
+    tbl.append(tb); wrap.append(tbl);
+  }
+  return wrap;
+}
+
+document.getElementById('custSearch').oninput = renderCustomers;
+document.getElementById('custFilter').onchange = renderCustomers;
+
+document.getElementById('addCustBtn').onclick = () => {
+  const f = document.getElementById('addCustForm');
+  if (f.style.display==='block'){ f.style.display='none'; return; }
+  f.style.display='block';
+  buildAddCustForm(f);
+};
+function buildAddCustForm(f){
+  f.replaceChildren();
+  const mkField = (label, id, type) => {
+    const fd = el('div',{class:'field'});
+    fd.append(el('label',null,label));
+    fd.append(el('input',{class:'input',id, type: type||'text'}));
+    return fd;
+  };
+  const r1 = el('div',{class:'grid-3'});
+  r1.append(mkField('Full Name *','nf-name'), mkField('Phone (primary) *','nf-phone'), mkField('Phone (secondary)','nf-phone2'));
+  f.append(r1);
+  const r2 = el('div',{class:'grid-2',style:'margin-top:10px'});
+  r2.append(mkField('Address','nf-addr'));
+  const linkedFd = el('div',{class:'field'});
+  linkedFd.append(el('label',null,'Linked paying member'));
+  const linkedIn = el('input',{class:'input',id:'nf-linked',list:'cust-list',placeholder:'type to search...'});
+  linkedFd.append(linkedIn);
+  const dl = el('datalist',{id:'cust-list'});
+  CUST.forEach(c => dl.append(el('option',{value: c.name+' — '+c.phone})));
+  linkedFd.append(dl);
+  r2.append(linkedFd);
+  f.append(r2);
+  const r3 = el('div',{class:'grid-3',style:'margin-top:10px'});
+  const coFd = el('div',{class:'field'}); coFd.append(el('label',null,'Company *'));
+  const coSel = el('select',{class:'select',id:'nf-co'}); coSel.append(el('option',{value:''},'—'));
+  COS.forEach(c => coSel.append(el('option',null,c)));
+  coFd.append(coSel); r3.append(coFd);
+  const newFd = el('div',{class:'field'}); newFd.append(el('label',null,'New / Existing'));
+  const newSel = el('select',{class:'select',id:'nf-new'});
+  newSel.append(el('option',{value:'true'},'New customer'),el('option',{value:'false'},'Existing'));
+  newFd.append(newSel); r3.append(newFd);
+  r3.append(mkField('Chit Amount','nf-chit','number'));
+  f.append(r3);
+  const r4 = el('div',{class:'grid-3',style:'margin-top:10px'});
+  const durFd = mkField('Duration (months)','nf-dur','number'); durFd.querySelector('input').value='20';
+  r4.append(durFd);
+  const stFd = mkField('Start Date','nf-start','date'); stFd.querySelector('input').value=todayISO();
+  r4.append(stFd);
+  const btnFd = el('div',{class:'field',style:'display:flex;align-items:flex-end;gap:6px;flex-direction:row'});
+  btnFd.append(el('button',{class:'btn',onclick:saveNewCustomer},'Save Customer'),
+               el('button',{class:'btn-ghost btn',onclick:()=>{f.style.display='none';}},'Cancel'));
+  r4.append(btnFd);
+  f.append(r4);
+  f.append(el('div',{id:'nf-msg',style:'margin-top:8px'}));
+}
+function saveNewCustomer(){
+  const v = id => document.getElementById(id).value.trim();
+  const name = v('nf-name'), phone = normPhone(v('nf-phone'));
+  const co = v('nf-co'); const chit = Number(v('nf-chit'))||0;
+  const msg = document.getElementById('nf-msg');
+  msg.replaceChildren();
+  if (!name || !phone || !co) { msg.append(el('span',{class:'pill err'},'Name, Phone and Company are required.')); return; }
+  let cust = CUST.find(c => c.phone===phone);
+  if (cust) {
+    if (!confirm('Customer with phone '+phone+' exists ('+cust.name+'). Add new enrolment to existing customer?')) return;
+  } else {
+    cust = { id:uid(), name, phone, phone2:normPhone(v('nf-phone2')), address:v('nf-addr'),
+      family_code:null, linked_member_id:null, source:'manual', created_at:new Date().toISOString() };
+    CUST.push(cust);
+  }
+  const linkedTxt = v('nf-linked');
+  if (linkedTxt) {
+    const found = CUST.find(c => (c.name+' — '+c.phone) === linkedTxt) || CUST.find(c=>linkedTxt.toLowerCase().includes(c.name.toLowerCase()));
+    if (found && found.id !== cust.id) cust.linked_member_id = found.id;
+  }
+  const code = nextInternalCode(co);
+  ENR.push({
+    id:uid(), customer_id:cust.id, company:co, internal_code:code, family_code:null,
+    chit_amount:chit, duration_months:Number(v('nf-dur'))||20,
+    monthly_installment: chit && v('nf-dur') ? Math.round(chit/Number(v('nf-dur'))) : 0,
+    start_date: v('nf-start')||todayISO(), status:'active',
+    is_new_customer: v('nf-new')==='true', created_at:new Date().toISOString()
+  });
+  computeFamilyCode(cust.id);
+  persist();
+  msg.append(el('span',{class:'pill ok'},'Saved. Internal code '+code+', Family code '+cust.family_code+'.'));
+  renderCustomers();
+}
+function editCust(id){
+  const c = CUST.find(x=>x.id===id); if (!c) return;
+  const name = prompt('Name', c.name); if (name===null) return;
+  const addr = prompt('Address', c.address||'');
+  const phone2 = prompt('Secondary phone', c.phone2||'');
+  c.name = name||c.name; c.address = addr||''; c.phone2 = normPhone(phone2);
+  persist(); renderCustomers();
+}
+function addEnrolPrompt(id){
+  const c = CUST.find(x=>x.id===id); if (!c) return;
+  const co = prompt('Company (A/B/C/D/E)','A'); if (!co || !COS.includes(co.toUpperCase())) return;
+  const chit = Number(prompt('Chit amount','100000'))||0;
+  const dur = Number(prompt('Duration months','20'))||20;
+  const code = nextInternalCode(co.toUpperCase());
+  ENR.push({ id:uid(), customer_id:c.id, company:co.toUpperCase(), internal_code:code, family_code:null,
+    chit_amount:chit, duration_months:dur, monthly_installment: dur?Math.round(chit/dur):0,
+    start_date: todayISO(), status:'active', is_new_customer:false, created_at:new Date().toISOString() });
+  computeFamilyCode(c.id); persist(); renderCustomers();
+  alert('Enrolment added. Internal: '+code+'. Family code: '+c.family_code);
+}
+function recordPayPrompt(id){
+  const c = CUST.find(x=>x.id===id); if (!c) return;
+  const en = ENR.filter(e=>e.customer_id===c.id);
+  if (!en.length) { alert('No enrolments. Add one first.'); return; }
+  const co = en.length===1 ? en[0].company : (prompt('Which company? '+en.map(e=>e.company).join('/'), en[0].company)||'').toUpperCase();
+  const enr = en.find(e=>e.company===co); if (!enr) return;
+  const amt = Number(prompt('Amount', enr.monthly_installment||0))||0;
+  if (!amt) return;
+  const mode = (prompt('Mode (cash/upi/cheque/neft)','cash')||'cash').toLowerCase();
+  const remarks = prompt('Remarks','')||'';
+  const r = recordPayment(c.id, co, amt, mode, remarks);
+  renderCustomers();
+  showReceiptModal(r);
+}
+
+function recordPayment(customer_id, company, amount, payment_mode, remarks){
+  const enr = ENR.find(e => e.customer_id===customer_id && e.company===company);
+  if (!enr) throw new Error('No enrolment for that company');
+  const txn = { id:uid(), enrolment_id:enr.id, customer_id, type:'chit_payment', amount, payment_mode,
+    date: todayISO(), receipt_id:null, remarks, created_at:new Date().toISOString() };
+  const rcpt = { id:uid(), receipt_number: nextReceiptNumber(company), customer_id, enrolment_id:enr.id,
+    txn_id: txn.id, amount, generated_at:new Date().toISOString(), printed:false };
+  txn.receipt_id = rcpt.id;
+  TXN.push(txn); RCT.push(rcpt); persist();
+  return rcpt;
+}
+
+function buildReceipt(rcpt, isPrint){
+  const c = CUST.find(x=>x.id===rcpt.customer_id);
+  const e = ENR.find(x=>x.id===rcpt.enrolment_id);
+  const t = TXN.find(x=>x.id===rcpt.txn_id);
+  const wrap = el('div',{class:'receipt'+(isPrint?' receipt-print':'')});
+  const rh = el('div',{class:'rh'});
+  rh.append(el('h2',null,CO.name));
+  const meta = el('div',{class:'meta'}); meta.append(CO.address||''); if (CO.phone) meta.append(' · '+CO.phone); rh.append(meta);
+  const meta2 = el('div',{class:'meta',style:'margin-top:6px'});
+  meta2.append(el('b',null,'Receipt No: '),rcpt.receipt_number+' · ',el('b',null,'Date: '),fmtDate(rcpt.generated_at));
+  rh.append(meta2); wrap.append(rh);
+  const rb = el('div',{class:'rb'});
+  const kv = (k,v,code) => { const d=el('div',{class:'kv'}); d.append(el('span',null,k)); d.append(code?el('span',{class:'code'},v):el('b',null,v)); return d; };
+  rb.append(kv('Customer', (c&&c.name)||''));
+  rb.append(kv('Phone', (c&&c.phone)||''));
+  rb.append(kv('Internal Code', (e&&e.internal_code)||'',true));
+  rb.append(kv('Family Code', (c&&c.family_code)||'',true));
+  rb.append(kv('Company', (e&&e.company)||''));
+  rb.append(kv('Chit Amount', inr((e&&e.chit_amount)||0)));
+  wrap.append(rb);
+  const amt = el('div',{class:'amt'}); amt.append(el('span',null,'Amount Received')); amt.append(el('span',{class:'v'},inr(rcpt.amount)));
+  wrap.append(amt);
+  const rb2 = el('div',{class:'rb'});
+  rb2.append(kv('Payment Mode', ((t&&t.payment_mode)||'').toUpperCase()));
+  rb2.append(kv('Month', fmtDate(rcpt.generated_at).split(' ').slice(1).join(' ')));
+  if (t && t.remarks) rb2.append(kv('Remarks', t.remarks));
+  wrap.append(rb2);
+  const rf = el('div',{class:'rf'}); rf.append(el('div',null,'Thank you for your payment.')); rf.append(el('div',{class:'sig'},'Authorized Signature'));
+  wrap.append(rf);
+  return wrap;
+}
+
+function showReceiptModal(rcpt){
+  const back = el('div',{class:'backdrop show'});
+  const modal = el('div',{class:'modal',style:'width:600px'});
+  modal.append(el('h3',null,'Receipt — '+rcpt.receipt_number));
+  const body = el('div',{class:'body'}); body.append(buildReceipt(rcpt,true)); modal.append(body);
+  const foot = el('div',{class:'foot'});
+  foot.append(el('button',{class:'btn-ghost btn',onclick:()=>back.remove()},'Close'),
+              el('button',{class:'btn-dark btn',onclick:()=>{rcpt.printed=true;persist();window.print();}},'Print'));
+  modal.append(foot); back.append(modal);
+  document.body.append(back);
+}
+
+const QUICKS = [
+  'Generate receipt','Find customer','Record payment','Send intimation message',
+  'Add new customer','Family summary','Monthly report'
+];
+function renderQuicks(){
+  const wrap = document.getElementById('quickActions');
+  wrap.replaceChildren();
+  QUICKS.forEach(q => {
+    const b = el('button',{onclick:()=>{document.getElementById('chatInput').value=q+' ';document.getElementById('chatInput').focus();}},q);
+    wrap.append(b);
+  });
+}
+function renderTodayStats(){
+  const t = todayISO();
+  const todayTxn = TXN.filter(x=>x.date===t);
+  const sum = todayTxn.reduce((a,b)=>a+(+b.amount||0),0);
+  const wrap = document.getElementById('todayStats');
+  wrap.replaceChildren();
+  const row = (k,v) => { const d=el('div',{class:'stat-row'}); d.append(el('span',null,k)); d.append(el('b',null,v)); return d; };
+  wrap.append(row('Customers', String(CUST.length)));
+  wrap.append(row('Active chits', String(ENR.filter(e=>e.status==='active').length)));
+  wrap.append(row("Today's collections", inr(sum)));
+}
+function renderChat(){
+  const m = document.getElementById('chatMsgs');
+  if (!CHAT.length) {
+    CHAT.push({role:'assistant', text:'Namaste! I am your ChitSync assistant. I can help you find customers, generate receipts, record payments, check balances, and send payment reminders — all in plain language. What would you like to do?', extra:null});
+    save(K.chat, CHAT);
+  }
+  m.replaceChildren();
+  CHAT.forEach(msg => {
+    const cls = msg.role === 'user' ? 'user' : 'ai';
+    const av = msg.role==='user' ? 'You' : 'AI';
+    const wrap = el('div',{class:'msg '+cls});
+    wrap.append(el('div',{class:'av'},av));
+    const bub = el('div',{class:'bubble'});
+    if (msg.text) {
+      msg.text.split('\n').forEach((line,i) => {
+        if (i) bub.append(el('br'));
+        bub.append(document.createTextNode(line));
+      });
+    }
+    if (msg.extra && msg.extra.nodeType) bub.append(msg.extra);
+    else if (msg.extra === '__typing__'){
+      const t = el('span',{class:'typing'}); t.append(el('span'),el('span'),el('span')); bub.append(t);
+    }
+    wrap.append(bub);
+    m.append(wrap);
+  });
+  m.scrollTop = m.scrollHeight;
+}
+function pushMsg(role, text, extraNode){
+  CHAT.push({role, text, extra: extraNode || null});
+  save(K.chat, CHAT.map(c => ({...c, extra: c.extra && c.extra.nodeType ? '__rendered__' : c.extra})));
+  renderChat();
+}
+
+document.getElementById('chatSend').onclick = sendChat;
+document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key==='Enter') sendChat(); });
+
+const SYS_PROMPT = `You are ChitSync AI, an assistant for chit fund branch staff in India.
+You have access to the customer database via JavaScript functions.
+
+COMPANY HIERARCHY: A > B > C > D > E
+Family Code rule: customer's highest-rank company's internal code = their Family Code.
+
+When staff ask you to do something, respond ONLY with a single JSON block (no prose around it):
+{
+  "action": "search_customer" | "generate_receipt" | "record_payment" | "get_family_summary" | "create_enrolment" | "get_transactions" | "send_intimation_text" | "monthly_report" | "none",
+  "params": { ...relevant parameters... },
+  "message": "Your friendly response to staff in plain English"
+}
+
+If the staff are just chatting or asking a question, set action to "none" and only fill the message.
+Always respond in plain conversational Indian English.
+Format currency with Indian number formatting (1,00,000 not 100,000).
+If you cannot find a customer, say so and suggest searching by phone or family code.
+Never make up data. Only use what the database returns.
+Keep responses short and actionable.`;
+
+async function callGroq(history){
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+apiKey() },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.2,
+      max_tokens: 1024,
+      response_format: { type: 'json_object' },
+      messages: [{ role:'system', content: SYS_PROMPT }, ...history]
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error && data.error.message) || 'Groq API error');
+  return ((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').trim();
+}
+async function callAnthropic(history){
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': apiKey(),
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:1024,
+      system: SYS_PROMPT,
+      messages: history
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error && data.error.message) || 'Anthropic API error');
+  return ((data.content && data.content[0] && data.content[0].text) || '').trim();
+}
+
+async function sendChat(){
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim(); if (!text) return;
+  inp.value=''; pushMsg('user', text);
+  if (!apiKey()) {
+    pushMsg('assistant','Please set your API key in Settings (gear icon, top right) to use the AI chat.');
+    return;
+  }
+  CHAT.push({role:'assistant', text:'', extra:'__typing__'});
+  renderChat();
+  try {
+    const history = CHAT.filter(m=>m.text).slice(-10).map(m => ({ role: m.role==='user'?'user':'assistant', content: m.text }));
+    const raw = aiProvider()==='anthropic' ? await callAnthropic(history) : await callGroq(history);
+    CHAT.pop();
+    const action = parseAction(raw);
+    if (!action) {
+      pushMsg('assistant', raw);
+      return;
+    }
+    const extra = await runAction(action.action, action.params||{});
+    pushMsg('assistant', action.message || '', extra);
+  } catch (e) {
+    if (CHAT.length && CHAT[CHAT.length-1].extra==='__typing__') CHAT.pop();
+    pushMsg('assistant', 'Could not connect to AI. ' + (e.message||'Check your API key.'));
+  }
+}
+function parseAction(text){
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    const obj = JSON.parse(m[0]);
+    if (obj && obj.action) return obj;
+  } catch {}
+  return null;
+}
+
+async function runAction(action, p){
+  try {
+    switch(action){
+      case 'search_customer':   return doSearch(p.query||p.q||p.name||'', (p.company||'').toUpperCase());
+      case 'generate_receipt':  return doGenerateReceipt(p);
+      case 'record_payment':    return doRecordPayment(p);
+      case 'get_family_summary':return doFamilySummary(p.family_code||p.code||'');
+      case 'create_enrolment':  return doCreateEnrolment(p);
+      case 'get_transactions':  return doGetTxns(p);
+      case 'send_intimation_text': return doIntimation(p);
+      case 'monthly_report':    return doMonthlyReport(p);
+      case 'none': default:     return null;
+    }
+  } catch(e) {
+    const c = el('div',{class:'ai-card'}); c.append(el('div',{class:'h'},'Error'),document.createTextNode(e.message)); return c;
+  }
+}
+
+function findCustomers(query, company){
+  const q = String(query||'').toLowerCase().trim();
+  const np = normPhone(query);
+  return CUST.filter(c => {
+    if (company){
+      if (!ENR.some(e=>e.customer_id===c.id && e.company===company)) return false;
+    }
+    if (!q) return true;
+    if (c.name.toLowerCase().includes(q)) return true;
+    if (np && c.phone===np) return true;
+    if ((c.family_code||'').toLowerCase()===q) return true;
+    return ENR.some(e => e.customer_id===c.id && e.internal_code.toLowerCase()===q);
+  });
+}
+function aiCard(title){
+  const c = el('div',{class:'ai-card'});
+  if (title) c.append(el('div',{class:'h'},title));
+  return c;
+}
+function doSearch(query, company){
+  const list = findCustomers(query, company);
+  if (!list.length){ const c=aiCard(); c.append('No matching customers. Try a phone number or family code.'); return c; }
+  const card = aiCard('Found '+list.length+' customer(s)');
+  list.slice(0,8).forEach(c => {
+    const en = ENR.filter(e=>e.customer_id===c.id);
+    const row = el('div',{style:'padding:6px 0;border-top:1px dashed var(--line)'});
+    row.append(el('b',null,c.name),' · ',c.phone,' · Family ',el('span',{class:'code'},c.family_code||'—'),el('br'));
+    en.forEach((e,i) => {
+      if (i) row.append('  ');
+      row.append(el('span',{class:'badge b-'+e.company},e.company),' ',el('span',{class:'code'},e.internal_code),' ',inr(e.chit_amount));
+    });
+    card.append(row);
+  });
+  return card;
+}
+function doGenerateReceipt(p){
+  const c = resolveCustomer(p);
+  if (!c){ const x=aiCard(); x.append('Customer not found. Provide name + company, or family/internal code.'); return x; }
+  const company = (p.company||'').toUpperCase();
+  if (p.amount){
+    const amt = Number(p.amount)||0;
+    const mode = (p.payment_mode||'cash').toLowerCase();
+    const co = company || (ENR.find(e=>e.customer_id===c.id)||{}).company;
+    const r = recordPayment(c.id, co, amt, mode, p.remarks||'');
+    renderTodayStats();
+    const card = aiCard('Receipt '+r.receipt_number);
+    card.append(buildReceipt(r,true));
+    const btnRow = el('div',{style:'margin-top:6px'}); btnRow.append(el('button',{class:'btn btn-sm',onclick:()=>window.print()},'Print'));
+    card.append(btnRow); return card;
+  }
+  const latest = TXN.filter(t=>t.customer_id===c.id).sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
+  if (latest && latest.receipt_id){
+    const r = RCT.find(x=>x.id===latest.receipt_id);
+    const card = aiCard('Latest receipt for '+c.name);
+    card.append(buildReceipt(r,true));
+    const btnRow = el('div',{style:'margin-top:6px'}); btnRow.append(el('button',{class:'btn btn-sm',onclick:()=>window.print()},'Print'));
+    card.append(btnRow); return card;
+  }
+  const x=aiCard(); x.append('No prior payment found. Tell me the amount and mode (e.g. "ravi paid 5000 cash company a") to generate a receipt.'); return x;
+}
+function doRecordPayment(p){
+  const c = resolveCustomer(p);
+  if (!c){ const x=aiCard(); x.append('Customer not found.'); return x; }
+  const company = (p.company||'').toUpperCase() || (ENR.find(e=>e.customer_id===c.id)||{}).company;
+  const amt = Number(p.amount)||0; if (!amt){ const x=aiCard(); x.append('Amount missing.'); return x; }
+  const r = recordPayment(c.id, company, amt, (p.payment_mode||'cash').toLowerCase(), p.remarks||'');
+  renderTodayStats();
+  const card = aiCard('Payment recorded · Receipt '+r.receipt_number);
+  card.append(buildReceipt(r,true));
+  return card;
+}
+function doFamilySummary(family_code){
+  const c = CUST.find(x => (x.family_code||'').toLowerCase() === String(family_code||'').toLowerCase());
+  if (!c){ const x=aiCard(); x.append('No family found for code '+family_code); return x; }
+  const linked = c.linked_member_id ? CUST.find(x=>x.id===c.linked_member_id) : null;
+  const fam = CUST.filter(x => x.family_code === c.family_code);
+  const card = aiCard('Family '+c.family_code);
+  const head = el('div'); head.append('Primary: ',el('b',null,c.name));
+  if (linked){ head.append(' · Linked to ',el('b',null,linked.name)); }
+  card.append(head);
+  fam.forEach(p => {
+    const en = ENR.filter(e=>e.customer_id===p.id);
+    const sec = el('div',{style:'margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)'});
+    sec.append(el('b',null,p.name),' · ',p.phone);
+    const tbl = el('table',{style:'margin-top:4px'});
+    const th = el('thead'); const tr = el('tr');
+    ['Co','Code','Chit','Monthly','Status'].forEach(h => tr.append(el('th',null,h)));
+    th.append(tr); tbl.append(th);
+    const tb = el('tbody');
+    if (!en.length){ const r = el('tr'); r.append(el('td',{colspan:'5',class:'muted'},'no enrolments')); tb.append(r); }
+    else en.forEach(e => {
+      const r = el('tr');
+      const tdC = el('td'); tdC.append(el('span',{class:'badge b-'+e.company},e.company)); r.append(tdC);
+      const tdK = el('td'); tdK.append(el('span',{class:'code'},e.internal_code)); r.append(tdK);
+      r.append(el('td',null,inr(e.chit_amount)),el('td',null,inr(e.monthly_installment)),el('td',null,e.status));
+      tb.append(r);
+    });
+    tbl.append(tb); sec.append(tbl); card.append(sec);
+  });
+  return card;
+}
+function doCreateEnrolment(p){
+  const phone = normPhone(p.phone);
+  let cust = phone ? CUST.find(c => c.phone===phone) : null;
+  if (!cust && p.name){
+    cust = { id:uid(), name:p.name, phone:phone||'', phone2:'', address:p.address||'',
+      family_code:null, linked_member_id:null, source:'manual', created_at:new Date().toISOString() };
+    CUST.push(cust);
+  }
+  if (!cust){ const x=aiCard(); x.append('Need at least name and phone to create.'); return x; }
+  if (p.linked_member_query) {
+    const lm = findCustomers(p.linked_member_query)[0];
+    if (lm && lm.id !== cust.id) cust.linked_member_id = lm.id;
+  }
+  const co = String(p.company||'').toUpperCase();
+  if (!COS.includes(co)){ const x=aiCard(); x.append('Company must be A/B/C/D/E.'); return x; }
+  const code = nextInternalCode(co);
+  const chit = Number(p.chit_amount||p.chit||0)||0;
+  const dur = Number(p.duration_months||20);
+  ENR.push({ id:uid(), customer_id:cust.id, company:co, internal_code:code, family_code:null,
+    chit_amount:chit, duration_months:dur, monthly_installment: dur?Math.round(chit/dur):0,
+    start_date: p.start_date||todayISO(), status:'active', is_new_customer:true, created_at:new Date().toISOString() });
+  computeFamilyCode(cust.id); persist(); renderTodayStats();
+  const card = aiCard('Customer saved');
+  card.append(el('b',null,cust.name),' · ',cust.phone, el('br'),
+              'Internal code: ', el('span',{class:'code'},code),' · Family code: ',el('span',{class:'code'},cust.family_code||''),el('br'),
+              'Company '+co+' · Chit '+inr(chit)+' · '+dur+' months');
+  return card;
+}
+function doGetTxns(p){
+  const c = resolveCustomer(p);
+  if (!c){ const x=aiCard(); x.append('Customer not found.'); return x; }
+  const lim = Number(p.limit||10);
+  const list = TXN.filter(t=>t.customer_id===c.id).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,lim);
+  if (!list.length){ const x=aiCard(); x.append('No transactions for '+c.name+'.'); return x; }
+  const card = aiCard('Last '+list.length+' transactions · '+c.name);
+  const tbl = el('table'); const th = el('thead'); const tr = el('tr');
+  ['Date','Amount','Mode','Receipt'].forEach(h => tr.append(el('th',null,h)));
+  th.append(tr); tbl.append(th);
+  const tb = el('tbody');
+  list.forEach(t => {
+    const r = RCT.find(x=>x.id===t.receipt_id);
+    const row = el('tr');
+    row.append(el('td',null,fmtDate(t.date)),el('td',null,inr(t.amount)),el('td',null,t.payment_mode));
+    const tdR = el('td'); tdR.append(el('span',{class:'code'},(r&&r.receipt_number)||'—')); row.append(tdR);
+    tb.append(row);
+  });
+  tbl.append(tb); card.append(tbl);
+  return card;
+}
+function doIntimation(p){
+  const month = p.month || new Date().toLocaleString('en-GB',{month:'long'});
+  const year = p.year || new Date().getFullYear();
+  let targets = [];
+  if (p.family_code){
+    const c = CUST.find(x => x.family_code === p.family_code);
+    if (c) targets = ENR.filter(e=>e.customer_id===c.id);
+  } else if (p.company){
+    targets = ENR.filter(e => e.company === String(p.company).toUpperCase() && e.status==='active');
+  }
+  if (!targets.length){ const x=aiCard(); x.append('No targets matched.'); return x; }
+  const msgs = targets.map(e => {
+    const c = CUST.find(x=>x.id===e.customer_id);
+    const due = inr(e.monthly_installment||0);
+    return 'Dear '+((c&&c.name)||'Customer')+', your chit installment of '+due+' for '+month+' '+year+' in Company '+e.company+' is due. Family Code: '+((c&&c.family_code)||'-')+'. Please pay by 10 '+month+'.';
+  });
+  const all = msgs.join('\n\n');
+  const card = aiCard(msgs.length+' intimation message(s)');
+  const ta = el('textarea',{class:'textarea',style:'width:100%;min-height:160px;font-family:monospace;font-size:12px'}); ta.value = all;
+  card.append(ta);
+  const row = el('div',{style:'margin-top:6px'});
+  const btn = el('button',{class:'btn btn-sm'},'Copy All');
+  btn.onclick = () => { navigator.clipboard.writeText(ta.value); btn.textContent='Copied ✓'; };
+  row.append(btn); card.append(row);
+  card.append(el('div',{class:'muted',style:'margin-top:6px;font-size:11px'},'Note: Actual WhatsApp send needs a paid API. Copy these and send manually for now.'));
+  return card;
+}
+function doMonthlyReport(p){
+  const co = String(p.company||'').toUpperCase();
+  const month = Number(p.month||(new Date().getMonth()+1));
+  const year = Number(p.year||new Date().getFullYear());
+  const inMonth = TXN.filter(t => {
+    if (co){
+      const e = ENR.find(x=>x.id===t.enrolment_id); if (!e || e.company!==co) return false;
+    }
+    const d = new Date(t.date);
+    return d.getMonth()+1===month && d.getFullYear()===year;
+  });
+  if (!inMonth.length){ const x=aiCard(); x.append('No transactions for '+(co||'all')+' '+month+'/'+year+'.'); return x; }
+  const groups = {};
+  inMonth.forEach(t => {
+    const c = CUST.find(x=>x.id===t.customer_id);
+    const fc = (c&&c.family_code) || '—';
+    if (!groups[fc]) groups[fc] = { name:(c&&c.name)||'?', code:fc, paid:0, count:0, company: (ENR.find(e=>e.id===t.enrolment_id)||{}).company||'-' };
+    groups[fc].paid += +t.amount||0;
+    groups[fc].count++;
+  });
+  const rows = Object.values(groups);
+  const card = aiCard('Monthly Report · '+(co||'All')+' · '+month+'/'+year);
+  const tbl = el('table'); const th = el('thead'); const tr = el('tr');
+  ['Name','Family','Co','Paid','Txns'].forEach(h => tr.append(el('th',null,h)));
+  th.append(tr); tbl.append(th);
+  const tb = el('tbody');
+  rows.forEach(r => {
+    const row = el('tr');
+    row.append(el('td',null,r.name));
+    const tdF = el('td'); tdF.append(el('span',{class:'code'},r.code)); row.append(tdF);
+    row.append(el('td',null,r.company),el('td',null,inr(r.paid)),el('td',null,String(r.count)));
+    tb.append(row);
+  });
+  tbl.append(tb); card.append(tbl);
+  const exp = el('button',{class:'btn btn-sm',style:'margin-top:6px'},'Export CSV');
+  exp.onclick = () => exportCsv(rows, 'report-'+(co||'all')+'-'+month+'-'+year+'.csv');
+  card.append(exp);
+  return card;
+}
+function exportCsv(rows, fname){
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => JSON.stringify(r[h]==null?'':r[h])).join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+}
+function resolveCustomer(p){
+  if (p.customer_id){ const c = CUST.find(x=>x.id===p.customer_id); if (c) return c; }
+  if (p.family_code){ const c = CUST.find(x=>x.family_code===p.family_code); if (c) return c; }
+  if (p.internal_code){
+    const e = ENR.find(x=>x.internal_code===p.internal_code);
+    if (e) return CUST.find(x=>x.id===e.customer_id);
+  }
+  if (p.phone){ const c = CUST.find(x=>x.phone===normPhone(p.phone)); if (c) return c; }
+  if (p.name){
+    const list = findCustomers(p.name, (p.company||'').toUpperCase());
+    if (list.length) return list[0];
+  }
+  return null;
+}
+
+function loadSample(){
+  if (CUST.length && !confirm('Replace existing data with sample data?')) return;
+  CUST=[]; ENR=[]; TXN=[]; RCT=[];
+  const mk = (name, phone) => ({ id:uid(), name, phone:normPhone(phone), phone2:'', address:'',
+    family_code:null, linked_member_id:null, source:'manual', created_at:new Date().toISOString() });
+  const addEnr = (cid, co, chit, dur) => { dur = dur||20; ENR.push({
+    id:uid(), customer_id:cid, company:co, internal_code:nextInternalCode(co), family_code:null,
+    chit_amount:chit, duration_months:dur, monthly_installment:Math.round(chit/dur),
+    start_date: todayISO(), status:'active', is_new_customer:false, created_at:new Date().toISOString()
+  }); };
+  const ravi = mk('Ravi Kumar','9876500001'); CUST.push(ravi);
+  addEnr(ravi.id,'A',100000); addEnr(ravi.id,'B',50000);
+  const suresh = mk('Suresh Iyer','9876500002'); CUST.push(suresh);
+  addEnr(suresh.id,'A',200000);
+  const priya = mk('Priya Iyer','9876500003'); CUST.push(priya);
+  addEnr(priya.id,'C',50000); priya.linked_member_id = suresh.id;
+  const lak = mk('Lakshmi Devi','9876500004'); CUST.push(lak);
+  addEnr(lak.id,'D',100000); addEnr(lak.id,'E',50000);
+  ['Anil Kumar','Meena Reddy','Vikram Rao','Kavita Sharma','Manoj Patel','Sunita Nair','Rajesh Menon']
+    .forEach((n,i) => {
+      const cust = mk(n, '987650'+String(1000+i)); CUST.push(cust);
+      const co = COS[i % 5]; addEnr(cust.id, co, [50000,100000,150000,200000,250000][i%5]);
+      if (i % 3 === 0){ const co2 = COS[(i+2)%5]; addEnr(cust.id, co2, 50000); }
+    });
+  CUST.forEach(c => computeFamilyCode(c.id));
+  recordPayment(ravi.id,'A', 5000,'cash','May 2026');
+  recordPayment(suresh.id,'A', 10000,'upi','May 2026');
+  persist();
+  renderCustomers(); renderTodayStats();
+}
+
+function showApiBannerIfMissing(){
+  const b = document.getElementById('importBanner');
+  b.replaceChildren();
+  if (!apiKey()){
+    const banner = el('div',{class:'banner'});
+    banner.append('No AI API key set. The Import & Customers tabs work fully offline. Set the key from ⚙ Settings to use the AI Chat tab.');
+    const btn = el('button',{class:'btn btn-sm btn-dark',onclick:()=>document.getElementById('openSettings').click()},'Open Settings');
+    banner.append(btn);
+    b.append(banner);
+  }
+}
+
+renderQuicks();
+refreshApiPill();
+showApiBannerIfMissing();
+if (CUST.length) renderImportResult({ total:CUST.length, matched:0, created:CUST.length, enrCreated:ENR.length });
+})();
+</script>
+</body>
+</html>
