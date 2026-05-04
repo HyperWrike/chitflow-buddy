@@ -41,3 +41,20 @@ The system models the application through these core tables (no substantial devi
 
 ## Deviations from Requirements
 - **.xlsx Uploads**: Out of the box, `PapaParse` natively accepts CSV. Supporting purely structured .xlsx often demands bulky libraries like `xlsx` or `exceljs`. A robust pre-parsing workflow via a lightweight serverless handler is currently deferred, focusing first on complete CSV fidelity. CSV provides equivalent mass-data abilities minus binary overheads.
+
+## Addendum: May 4, 2026
+### What changed most recently
+- Added a real in-app `ChitSync` route at [`src/routes/chitsync.tsx`](/home/mounesh/Documents/HyperWrike/demos/chitflow-buddy/src/routes/chitsync.tsx) that embeds the existing `chitsync.html` experience using `srcDoc`, so the tool opens inside the software instead of as a separate browser-only page.
+- Removed the remaining admin/operator gates from the visible Subscribers and Group screens. The management actions now render consistently for normal authenticated users.
+- Added an explicit empty-state message on the Subscribers page so it is obvious when the database has no people records yet.
+- Added `scripts/seed-dummy-data.ts` with 10 realistic subscriber records plus 3 chit groups and memberships prepared for a writable Supabase environment.
+
+### Test results
+- `npm run build` completed successfully after the latest changes.
+- In-browser verification of the embedded `ChitSync` route succeeded. The built-in sample data loader populated the local demo workspace and showed import totals and customer rows.
+- The database seeding script could not write to Supabase because row-level security blocked inserts into `subscribers`.
+
+### Important blocker
+- The production Supabase database currently contains no subscriber rows.
+- Writing the 10-person demo dataset directly into Supabase requires either a service-role key or an RLS policy change that allows writes from the current session.
+- Until that is available, the in-app `ChitSync` workspace is the working demo environment for sample data and relationship testing.
