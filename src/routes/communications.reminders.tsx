@@ -1,13 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/db-types";
-import { Bell, Gift, Receipt, Send, Printer, RefreshCw } from "lucide-react";
+import { Bell, Gift, Receipt, Send, Printer, RefreshCw, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { currentMonth, formatINR, formatDateDMY, formatMonth, monthOptions } from "@/lib/format";
 import { computeGroupTotals, computeMemberDue } from "@/lib/calculator";
 import { printElement } from "@/lib/printable";
 import { toast } from "sonner";
+import {
+  addDemoDispatches,
+  ensureDemoState,
+  getDemoDispatches,
+  getDemoGroups,
+  getDemoMonthlyEntries,
+  getDemoSubscribers,
+  getDemoSubscriptions,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/communications/reminders")({
   component: () => (
@@ -31,39 +41,84 @@ type Row = {
   dispatchStatus?: string;
 };
 
+const PAGE_SIZE = 50;
+
 function RemindersPage() {
   const qc = useQueryClient();
   const [month, setMonth] = useState(currentMonth());
   const [previewIdx, setPreviewIdx] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "pending" | "failed">("all");
+  const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    ensureDemoState();
+    qc.invalidateQueries({ queryKey: ["reminders-rows"] });
+  }, [qc]);
+
+  useDemoSync([["reminders-rows", month]]);
 
   const data = useQuery({
     queryKey: ["reminders-rows", month],
     queryFn: async (): Promise<Row[]> => {
-      const { data: entries } = await db
+      const { data: dbEntries } = await db
         .from("monthly_entries")
         .select("id, group_id, winning_bid, locked, chit_groups!inner(id, group_code, chit_value, duration_months, commission_rate, auction_day)")
         .eq("month", month);
-      if (!entries || entries.length === 0) return [];
+
+      let entries: any[] = dbEntries ?? [];
+      let subs: any[] = [];
+      let dispatches: any[] = [];
+
+      if (!entries.length) {
+        const demoGroups = getDemoGroups();
+        const demoEntries = getDemoMonthlyEntries(month);
+        entries = demoEntries.map((e) => {
+          const g = demoGroups.find((x) => x.id === e.group_id);
+          if (!g) return null;
+          return { id: e.id, group_id: e.group_id, winning_bid: e.winning_bid, locked: e.locked, chit_groups: { id: g.id, group_code: g.group_code, chit_value: g.chit_value, duration_months: g.duration_months, commission_rate: g.commission_rate, auction_day: g.auction_day } };
+        }).filter(Boolean);
+      }
+      if (!entries.length) return [];
 
       const groupIds = entries.map((e: any) => e.group_id);
-      const { data: subs } = await db
+
+      const { data: dbSubs } = await db
         .from("subscriptions")
         .select("id, subscriber_id, group_id, seat_count, prized, subscribers!inner(id, name, access_code, whatsapp_number, address_line1, city, pincode)")
         .in("group_id", groupIds)
         .eq("active", true);
-      if (!subs) return [];
+      subs = dbSubs ?? [];
+      if (!subs.length) {
+        const demoSubscriptions = getDemoSubscriptions().filter((s) => groupIds.includes(s.group_id) && s.active !== false);
+        const demoSubscribers = getDemoSubscribers();
+        subs = demoSubscriptions.map((s) => {
+          const sub = demoSubscribers.find((x) => x.id === s.subscriber_id);
+          if (!sub) return null;
+          return {
+            id: s.id, subscriber_id: s.subscriber_id, group_id: s.group_id, seat_count: s.seat_count, prized: s.prized,
+            subscribers: { id: sub.id, name: sub.name, access_code: sub.access_code, whatsapp_number: sub.whatsapp_number, address_line1: sub.address_line1, city: sub.city, pincode: sub.pincode },
+          };
+        }).filter(Boolean);
+      }
+      if (!subs.length) return [];
 
       const seatTotals = new Map<string, number>();
       subs.forEach((s: any) => seatTotals.set(s.group_id, (seatTotals.get(s.group_id) ?? 0) + s.seat_count));
 
-      const { data: dispatches } = await db
+      const { data: dbDispatch } = await db
         .from("dispatch_log")
         .select("subscriber_id, status")
         .eq("month", month)
         .eq("type", "reminder");
+      dispatches = dbDispatch ?? [];
+      if (!dispatches.length) {
+        dispatches = getDemoDispatches(month, "reminder").map((d) => ({ subscriber_id: d.subscriber_id, status: d.status }));
+      }
       const dispatchBySub = new Map<string, string>();
-      (dispatches ?? []).forEach((d: any) => dispatchBySub.set(d.subscriber_id, d.status));
+      dispatches.forEach((d: any) => dispatchBySub.set(d.subscriber_id, d.status));
 
       const bySub = new Map<string, Row>();
       subs.forEach((s: any) => {
@@ -111,20 +166,58 @@ function RemindersPage() {
     },
   });
 
-  const rows = data.data ?? [];
-  const previewRow = rows[previewIdx];
+  const allRows = data.data ?? [];
+
+  const groupOptions = useMemo(() => {
+    const codes = new Set<string>();
+    allRows.forEach((r) => r.groups.forEach((g) => codes.add(g.groupCode)));
+    return Array.from(codes).sort();
+  }, [allRows]);
+
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return allRows.filter((r) => {
+      if (term) {
+        const hay = `${r.name} ${r.accessCode} ${r.phone}`.toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      if (statusFilter !== "all") {
+        const st = r.dispatchStatus ?? "pending";
+        if (st !== statusFilter) return false;
+      }
+      if (groupFilter !== "all") {
+        if (!r.groups.some((g) => g.groupCode === groupFilter)) return false;
+      }
+      return true;
+    });
+  }, [allRows, search, statusFilter, groupFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageStart = safePage * PAGE_SIZE;
+  const rows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
+  const previewRow = rows[previewIdx] ?? rows[0];
+
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setGroupFilter("all");
+    setPage(0);
+  };
 
   const sendOne = async (sub: Row) => {
     setBusy(true);
     try {
-      await db.from("dispatch_log").insert({
+      const row = {
         subscriber_id: sub.subscriberId,
         type: "reminder",
         month,
         whatsapp_number: sub.phone,
         status: "sent",
         sent_at: new Date().toISOString(),
-      });
+      };
+      await db.from("dispatch_log").insert(row);
+      addDemoDispatches([row]);
       toast.success(`Reminder logged for ${sub.name}`);
       qc.invalidateQueries({ queryKey: ["reminders-rows"] });
     } catch (e: any) {
@@ -135,11 +228,11 @@ function RemindersPage() {
   };
 
   const sendAll = async () => {
-    if (rows.length === 0) return;
-    if (!confirm(`Send reminders to all ${rows.length} subscribers? (mock — no real WhatsApp dispatch)`)) return;
+    if (filteredRows.length === 0) return;
+    if (!confirm(`Send reminders to all ${filteredRows.length} subscribers? (mock — no real WhatsApp dispatch)`)) return;
     setBusy(true);
     try {
-      const toInsert = rows.map((r) => ({
+      const toInsert = filteredRows.map((r) => ({
         subscriber_id: r.subscriberId,
         type: "reminder",
         month,
@@ -148,7 +241,8 @@ function RemindersPage() {
         sent_at: new Date().toISOString(),
       }));
       await db.from("dispatch_log").insert(toInsert);
-      toast.success(`Sent ${rows.length} reminders`);
+      addDemoDispatches(toInsert);
+      toast.success(`Sent ${filteredRows.length} reminders`);
       qc.invalidateQueries({ queryKey: ["reminders-rows"] });
     } catch (e: any) {
       toast.error(e.message);
@@ -178,9 +272,41 @@ function RemindersPage() {
           <button onClick={() => previewRow && printElement("reminder-printable", `Statement — ${previewRow.name}`)} disabled={!previewRow} className="inline-flex items-center gap-1.5 px-3 py-2 rounded border text-sm disabled:opacity-50">
             <Printer className="h-4 w-4" /> Print preview
           </button>
-          <button onClick={sendAll} disabled={busy || rows.length === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50">
-            <Send className="h-4 w-4" /> Send all ({rows.length})
+          <button onClick={sendAll} disabled={busy || filteredRows.length === 0} className="inline-flex items-center gap-1.5 px-3 py-2 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50">
+            <Send className="h-4 w-4" /> Send all ({filteredRows.length})
           </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search name, code, or phone…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            className="w-full pl-8 pr-3 py-2 rounded border bg-surface text-sm"
+          />
+        </div>
+        <select value={groupFilter} onChange={(e) => { setGroupFilter(e.target.value); setPage(0); }} className="px-3 py-2 rounded border bg-surface text-sm">
+          <option value="all">All groups</option>
+          {groupOptions.map((g) => (<option key={g} value={g}>{g}</option>))}
+        </select>
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as any); setPage(0); }} className="px-3 py-2 rounded border bg-surface text-sm">
+          <option value="all">All statuses</option>
+          <option value="sent">Sent</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+        </select>
+        {(search || statusFilter !== "all" || groupFilter !== "all") && (
+          <button onClick={clearFilters} className="inline-flex items-center gap-1 px-2.5 py-2 rounded border text-xs hover:bg-accent">
+            <X className="h-3 w-3" /> Clear filters
+          </button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground">
+          Showing {filteredRows.length === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of {filteredRows.length}
+          {filteredRows.length !== allRows.length && ` (filtered from ${allRows.length})`}
         </div>
       </div>
 
@@ -189,10 +315,15 @@ function RemindersPage() {
           <div className="px-4 py-2 border-b text-sm font-medium bg-muted/40">Dispatch list — {formatMonth(month)}</div>
           <div className="max-h-[640px] overflow-auto divide-y">
             {data.isLoading && <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>}
-            {!data.isLoading && rows.length === 0 && (
+            {!data.isLoading && filteredRows.length === 0 && allRows.length === 0 && (
               <div className="p-12 text-center text-sm text-muted-foreground">
                 No monthly entries found for {formatMonth(month)}.<br />
                 Enter monthly auction data first to generate reminders.
+              </div>
+            )}
+            {!data.isLoading && filteredRows.length === 0 && allRows.length > 0 && (
+              <div className="p-12 text-center text-sm text-muted-foreground">
+                No subscribers match your filters.
               </div>
             )}
             {rows.map((r, i) => (
@@ -223,6 +354,25 @@ function RemindersPage() {
               </button>
             ))}
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/30 text-xs">
+              <button
+                disabled={safePage === 0}
+                onClick={() => { setPage(Math.max(0, safePage - 1)); setPreviewIdx(0); }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border disabled:opacity-40"
+              >
+                <ChevronLeft className="h-3 w-3" /> Prev
+              </button>
+              <span className="text-muted-foreground">Page {safePage + 1} of {totalPages}</span>
+              <button
+                disabled={safePage >= totalPages - 1}
+                onClick={() => { setPage(Math.min(totalPages - 1, safePage + 1)); setPreviewIdx(0); }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded border disabled:opacity-40"
+              >
+                Next <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div>

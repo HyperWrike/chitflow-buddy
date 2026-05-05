@@ -1,9 +1,23 @@
-import type { ChitGroup, Subscriber, Subscription } from "@/lib/db-types";
+import type { ChitGroup, MonthlyEntry, Subscriber, Subscription } from "@/lib/db-types";
+
+type DemoMonthlyEntry = MonthlyEntry & { month: string };
+
+type DemoDispatch = {
+  id: string;
+  subscriber_id: string;
+  type: string;
+  month: string;
+  whatsapp_number: string;
+  status: string;
+  sent_at: string | null;
+};
 
 type DemoState = {
   subscribers: Subscriber[];
   groups: ChitGroup[];
   subscriptions: Subscription[];
+  monthlyEntries?: DemoMonthlyEntry[];
+  dispatches?: DemoDispatch[];
 };
 
 const DEMO_KEY = "panasuna_demo_state_v1";
@@ -73,7 +87,36 @@ const seedState = (): DemoState => {
     { id: makeId(), subscriber_id: subscriberByCode.get("PCPL0010")!.id, group_id: groupByCode.get("CHIT-B1")!.id, name_on_chit: "Rajesh Menon", seat_count: 1, prized: false, prized_month: null, active: true },
   ];
 
-  return { subscribers, groups, subscriptions };
+  const month = new Date().toISOString().slice(0, 7);
+  const monthlyEntries: DemoMonthlyEntry[] = groups.map((group) => ({
+    id: makeId(),
+    group_id: group.id,
+    month,
+    winning_bid: Math.round(group.chit_value * 0.78),
+    company_commission: Math.round(group.chit_value * (group.commission_rate / 100)),
+    prized_subscription_id: null,
+    locked: false,
+  }));
+
+  // Seed a mix of dispatch states so the reminders/communications page has realistic data
+  const dispatches: DemoDispatch[] = [];
+  const dispatchStates = ["sent", "sent", "sent", "pending", "failed"];
+  let state_i = 0;
+  for (const subscriber of subscribers) {
+    const status = dispatchStates[state_i++ % dispatchStates.length];
+    if (status === "pending") continue; // pending = no dispatch row, just absence
+    dispatches.push({
+      id: makeId(),
+      subscriber_id: subscriber.id,
+      type: "reminder",
+      month,
+      whatsapp_number: subscriber.whatsapp_number,
+      status,
+      sent_at: status === "sent" ? new Date(Date.now() - Math.random() * 7 * 86400000).toISOString() : null,
+    });
+  }
+
+  return { subscribers, groups, subscriptions, monthlyEntries, dispatches };
 };
 
 const readState = (): DemoState => {
@@ -90,6 +133,17 @@ const readState = (): DemoState => {
       const state = seedState();
       window.localStorage.setItem(DEMO_KEY, JSON.stringify(state));
       return state;
+    }
+    // Migrate forward: older states may not have monthlyEntries or dispatches.
+    if (!parsed.monthlyEntries?.length || !parsed.dispatches?.length) {
+      const fresh = seedState();
+      const migrated = {
+        ...parsed,
+        monthlyEntries: parsed.monthlyEntries?.length ? parsed.monthlyEntries : fresh.monthlyEntries,
+        dispatches: parsed.dispatches?.length ? parsed.dispatches : fresh.dispatches,
+      };
+      window.localStorage.setItem(DEMO_KEY, JSON.stringify(migrated));
+      return migrated;
     }
     return parsed;
   } catch {
@@ -232,6 +286,67 @@ export const deleteDemoSubscription = (subscriptionId: string) => {
   writeState({ ...state, subscriptions: state.subscriptions.filter((subscription) => subscription.id !== subscriptionId) });
 };
 
+export const getDemoMonthlyEntries = (month?: string) => {
+  const state = readState();
+  let entries = state.monthlyEntries ?? [];
+
+  if (month && !entries.some((e) => e.month === month)) {
+    const groups = state.groups;
+    const newEntries = groups.map((group) => ({
+      id: makeId(),
+      group_id: group.id,
+      month,
+      winning_bid: Math.round(group.chit_value * 0.78),
+      company_commission: Math.round(group.chit_value * (group.commission_rate / 100)),
+      prized_subscription_id: null,
+      locked: false,
+    }));
+    entries = [...entries, ...newEntries];
+    writeState({ ...state, monthlyEntries: entries });
+  }
+
+  return month ? entries.filter((e) => e.month === month) : entries;
+};
+
+export const upsertDemoMonthlyEntry = (entry: Partial<DemoMonthlyEntry> & { group_id: string; month: string; winning_bid: number; company_commission: number }) => {
+  const state = readState();
+  const list = state.monthlyEntries ?? [];
+  const existing = list.find((e) => e.group_id === entry.group_id && e.month === entry.month);
+  let next: DemoMonthlyEntry;
+  if (existing) {
+    next = { ...existing, ...entry };
+    writeState({ ...state, monthlyEntries: list.map((e) => (e.id === existing.id ? next : e)) });
+  } else {
+    next = {
+      id: makeId(),
+      group_id: entry.group_id,
+      month: entry.month,
+      winning_bid: entry.winning_bid,
+      company_commission: entry.company_commission,
+      prized_subscription_id: entry.prized_subscription_id ?? null,
+      locked: entry.locked ?? false,
+    };
+    writeState({ ...state, monthlyEntries: [...list, next] });
+  }
+  return next;
+};
+
+export const getDemoDispatches = (month?: string, type?: string) => {
+  const list = readState().dispatches ?? [];
+  return list.filter((d) => (!month || d.month === month) && (!type || d.type === type));
+};
+
+export const addDemoDispatches = (rows: Omit<DemoDispatch, "id">[]) => {
+  const state = readState();
+  const list = state.dispatches ?? [];
+  const next = [...list, ...rows.map((r) => ({ ...r, id: makeId() }))];
+  writeState({ ...state, dispatches: next });
+};
+
+export const peekNextAccessCode = (): string => {
+  return nextAccessCode(readState());
+};
+
 export type ImportRow = {
   subscriberName: string;
   accessCode?: string | null;
@@ -248,6 +363,9 @@ export type ImportRow = {
   commissionRate?: number | null;
   seats?: number | null;
   nameOnChit?: string | null;
+  prized?: boolean | null;
+  previousBidAmount?: number | null;
+  shareOfDiscount?: number | null;
 };
 
 export type ImportSummary = {
@@ -351,7 +469,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
           group_id: group.id,
           name_on_chit: row.nameOnChit?.trim() || subscriber.name,
           seat_count: Number(row.seats) || 1,
-          prized: false,
+          prized: row.prized === true,
           prized_month: null,
           active: true,
         });

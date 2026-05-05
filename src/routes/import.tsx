@@ -22,24 +22,36 @@ function ImportPage() {
 }
 
 const FIELD_DEFS: { key: keyof ImportRow; label: string; required?: boolean; aliases: string[] }[] = [
-  { key: "subscriberName", label: "Subscriber Name", required: true, aliases: ["subscriber", "subscriber name", "name", "full name", "customer", "customer name", "member", "member name"] },
-  { key: "accessCode", label: "Access Code", aliases: ["code", "access code", "subscriber code", "id", "subscriber id", "pcpl"] },
-  { key: "whatsapp", label: "WhatsApp", aliases: ["whatsapp", "whatsapp number", "phone", "mobile", "mobile no", "phone no", "contact"] },
+  { key: "subscriberName", label: "Subscriber Name", required: true, aliases: ["subscriber", "subscriber name", "name", "full name", "customer", "customer name", "member", "member name", "subscriber name "] },
+  { key: "accessCode", label: "Access Code", aliases: ["code", "access code", "subscriber code", "id", "subscriber id", "pcpl", "member code", "member id"] },
+  { key: "whatsapp", label: "WhatsApp", aliases: ["whatsapp", "whatsapp number", "phone", "mobile", "mobile no", "phone no", "contact", "phone number", "mob", "mob no"] },
   { key: "altPhone", label: "Alt Phone", aliases: ["alt", "alt phone", "alternate", "alternate phone", "secondary phone"] },
   { key: "addressLine1", label: "Address Line 1", aliases: ["address", "address1", "address line 1", "addr1"] },
   { key: "addressLine2", label: "Address Line 2", aliases: ["address2", "address line 2", "addr2"] },
   { key: "city", label: "City", aliases: ["city", "town"] },
   { key: "pincode", label: "Pincode", aliases: ["pin", "pincode", "zip", "postal", "postal code"] },
-  { key: "groupCode", label: "Group Code", aliases: ["group", "group code", "chit code", "chit group", "scheme"] },
-  { key: "chitValue", label: "Chit Value", aliases: ["chit value", "value", "amount", "chit amount"] },
-  { key: "durationMonths", label: "Duration (months)", aliases: ["duration", "months", "duration months", "term"] },
+  { key: "groupCode", label: "Group Code", aliases: ["group", "group code", "chit code", "chit group", "scheme", "ps", "chit"] },
+  { key: "chitValue", label: "Chit Value", aliases: ["chit value", "value", "amount", "chit amount", "chit amount (after incentive)"] },
+  { key: "durationMonths", label: "Duration (months)", aliases: ["duration", "months", "duration months", "term", "period"] },
   { key: "auctionDay", label: "Auction Day", aliases: ["auction day", "auction date", "day"] },
   { key: "commissionRate", label: "Commission %", aliases: ["commission", "commission rate", "commission %"] },
   { key: "seats", label: "Seats", aliases: ["seats", "seat count", "shares"] },
   { key: "nameOnChit", label: "Name on Chit", aliases: ["name on chit", "chit name"] },
+  { key: "prized", label: "Prized (Yes/No)", aliases: ["prized", "prized (yes/no)", "prized yes/no", "is prized"] },
+  { key: "previousBidAmount", label: "Previous Bid Amount", aliases: ["previous bid amount", "previous bid", "prev bid", "winning bid"] },
+  { key: "shareOfDiscount", label: "Share of Discount", aliases: ["share of discount", "discount share", "share discount"] },
 ];
 
-const NUMBER_FIELDS: (keyof ImportRow)[] = ["chitValue", "durationMonths", "auctionDay", "commissionRate", "seats"];
+const NUMBER_FIELDS: (keyof ImportRow)[] = ["chitValue", "durationMonths", "auctionDay", "commissionRate", "seats", "previousBidAmount", "shareOfDiscount"];
+const BOOLEAN_FIELDS: (keyof ImportRow)[] = ["prized"];
+
+const parseBool = (v: string): boolean => /^(y|yes|true|1|prized)$/i.test(v.trim());
+
+// Period column like "19/30" — second number is duration in months.
+const tryParsePeriod = (v: string): number | null => {
+  const m = String(v).match(/(\d+)\s*\/\s*(\d+)/);
+  return m ? Number(m[2]) : null;
+};
 
 const norm = (s: string) => s.toString().trim().toLowerCase().replace(/[._\-]+/g, " ").replace(/\s+/g, " ");
 
@@ -65,7 +77,209 @@ type ParsedFile = {
   fileName: string;
   headers: string[];
   rows: Record<string, string>[];
+  templateRows?: ImportRow[];
+  templateMode?: boolean;
 };
+
+const PANASUNA_HEADERS = ["auction date", "subscriber name", "chit value"];
+
+function looksLikePanasunaTemplate(grid: string[][]): boolean {
+  const flat = grid
+    .slice(0, 30)
+    .map((row) => row.map((c) => String(c).toLowerCase()).join(" | "))
+    .join("\n");
+  if (flat.includes("panasuna") && flat.includes("member code")) return true;
+  if (flat.includes("auction date") && flat.includes("prized") && flat.includes("chit value") && flat.includes("period")) return true;
+  return false;
+}
+
+function parsePanasunaGrid(grid: string[][]): ImportRow[] {
+  const out: ImportRow[] = [];
+
+  type Block = {
+    name: string;
+    accessCode: string;
+    phone: string;
+    addressLines: string[];
+    headerRow?: number;
+    columnMap?: Record<string, number>;
+  };
+
+  let block: Block | null = null;
+
+  const stripHonorifics = (s: string) => s.replace(/^(mr\.?|mrs\.?|dr\.?|ms\.?|sri|smt|miss|shri)\s*/i, "").trim();
+
+  const extractMemberCode = (text: string): string | null => {
+    const m = text.match(/PCPL\s*0*(\d{1,5})/i);
+    return m ? `PCPL${String(m[1]).padStart(4, "0")}` : null;
+  };
+
+  const extractPhone = (text: string): string | null => {
+    const m = text.match(/(\d{10,12})/);
+    if (!m) return null;
+    const digits = m[1].replace(/\D/g, "");
+    return digits.slice(-10);
+  };
+
+  const isHeaderRow = (row: string[]): boolean => {
+    const lower = row.map((c) => String(c).toLowerCase().trim());
+    return PANASUNA_HEADERS.every((needle) => lower.some((cell) => cell.includes(needle)));
+  };
+
+  const buildColumnMap = (row: string[]): Record<string, number> => {
+    const map: Record<string, number> = {};
+    row.forEach((cell, idx) => {
+      const k = String(cell).toLowerCase().trim().replace(/\s+/g, " ");
+      if (!k) return;
+      map[k] = idx;
+    });
+    return map;
+  };
+
+  const get = (row: string[], cm: Record<string, number>, ...keys: string[]) => {
+    for (const k of keys) {
+      const idx = cm[k];
+      if (idx != null && row[idx] != null) {
+        const v = String(row[idx]).trim();
+        if (v) return v;
+      }
+    }
+    return "";
+  };
+
+  const parseNum = (v: string): number | null => {
+    if (!v) return null;
+    const cleaned = v.replace(/[,\s]/g, "").replace(/[^\d.\-]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const SUMMARY_LABELS = ["total", "grand total", "previous pending", "sub total", "sub-total", "subtotal", "balance", "previous balance", "pending", "carried forward", "carry forward", "outstanding"];
+
+  const isTotalRow = (row: string[]): boolean => {
+    const cells = row.map((c) => String(c).toLowerCase().trim()).filter(Boolean);
+    if (cells.some((c) => SUMMARY_LABELS.includes(c))) return true;
+    const joined = cells.join(" | ");
+    return /\b(grand\s*total|previous\s*pending|sub[\s-]?total|previous\s*balance|carried\s*forward|carry\s*forward|outstanding)\b/.test(joined)
+      || /(^|\|\s*)total(\s*|\s*\|)/.test(joined);
+  };
+
+  const startNewBlock = () => {
+    block = { name: "", accessCode: "", phone: "", addressLines: [] };
+  };
+
+  for (let i = 0; i < grid.length; i++) {
+    const row = grid[i].map((c) => String(c ?? "").trim());
+
+    if (row.every((c) => !c)) continue;
+
+    const rowJoined = row.join(" | ");
+
+    if (rowJoined.toLowerCase().includes("panasuna chits")) {
+      if (block && (block.name || block.accessCode || block.phone) && !block.headerRow) {
+        // Header repeated — start a new block
+        block = null;
+      }
+      if (!block) startNewBlock();
+      continue;
+    }
+
+    if (rowJoined.toLowerCase().includes("member code")) {
+      const code = extractMemberCode(rowJoined);
+      if (code) {
+        if (!block) startNewBlock();
+        block!.accessCode = code;
+      }
+    }
+    if (rowJoined.toLowerCase().includes("phone no")) {
+      const ph = extractPhone(rowJoined);
+      if (ph && ph.length === 10) {
+        if (!block) startNewBlock();
+        block!.phone = ph;
+      }
+    }
+
+    for (const cell of row) {
+      const m = cell.match(/^Dear\s+(.+?)[,.]?$/i);
+      if (m) {
+        if (!block) startNewBlock();
+        block!.name = stripHonorifics(m[1].trim().replace(/\.$/, "")).trim();
+      }
+    }
+
+    if (isHeaderRow(row)) {
+      if (!block) startNewBlock();
+      block!.headerRow = i;
+      block!.columnMap = buildColumnMap(row);
+      continue;
+    }
+
+    if (block?.headerRow != null) {
+      if (isTotalRow(row)) {
+        // End of this block's data section. Reset block.
+        block = null;
+        continue;
+      }
+      const cm = block.columnMap!;
+      const groupCode = get(row, cm, "group");
+      const subscriberOnRow = get(row, cm, "subscriber name");
+      if (!groupCode && !subscriberOnRow) continue;
+
+      const summaryCheck = `${groupCode} ${subscriberOnRow}`.toLowerCase().trim();
+      if (SUMMARY_LABELS.some((label) => summaryCheck === label || summaryCheck.startsWith(label + " ") || summaryCheck.endsWith(" " + label))) continue;
+
+      const auctionStr = get(row, cm, "auction date", "auction day");
+      const prizedStr = get(row, cm, "prized (yes/no)", "prized yes/no", "prized");
+      const chitVal = get(row, cm, "chit value");
+      const prevBid = get(row, cm, "previous bid amount");
+      const shareDisc = get(row, cm, "share of discount");
+      const period = get(row, cm, "period");
+      const chitAmtAfter = get(row, cm, "chit amount (after incentive)", "chit amount");
+
+      const periodMatch = period.match(/(\d+)\s*\/\s*(\d+)/);
+      const durationMonths = periodMatch ? Number(periodMatch[2]) : null;
+
+      out.push({
+        subscriberName: block.name || subscriberOnRow,
+        accessCode: block.accessCode || null,
+        whatsapp: block.phone || null,
+        addressLine1: block.addressLines.slice(0, 2).join(", ") || null,
+        addressLine2: block.addressLines.slice(2).join(", ") || null,
+        city: "Salem",
+        pincode: (block.addressLines.join(" ").match(/(\d{6})/) || [null, null])[1],
+        groupCode: groupCode || null,
+        chitValue: parseNum(chitVal),
+        durationMonths,
+        auctionDay: parseNum(auctionStr),
+        seats: 1,
+        nameOnChit: subscriberOnRow || block.name,
+        prized: /^y/i.test(prizedStr),
+        previousBidAmount: parseNum(prevBid),
+        shareOfDiscount: parseNum(shareDisc),
+      });
+      continue;
+    }
+
+    // Address capture: any non-marker text inside an open block before header
+    if (block && !block.headerRow) {
+      for (const cell of row) {
+        if (!cell) continue;
+        if (/panasuna|chits|rosci|good day|member code|phone no|chit details|kindly note|^dear |january|february|march|april|may|june|july|august|september|october|november|december/i.test(cell)) continue;
+        if (cell.length < 3) continue;
+        block.addressLines.push(cell);
+      }
+    }
+  }
+
+  // De-dupe identical rows (same person + same group)
+  const seen = new Set<string>();
+  return out.filter((r) => {
+    const key = `${(r.accessCode || r.subscriberName || "").toLowerCase()}::${(r.groupCode || "").toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function Importer() {
   const qc = useQueryClient();
@@ -94,6 +308,26 @@ function Importer() {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
+        const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" }) as string[][];
+
+        if (looksLikePanasunaTemplate(grid)) {
+          const templateRows = parsePanasunaGrid(grid);
+          if (!templateRows.length) {
+            toast.error("Template detected but no subscriber rows could be extracted.");
+            return;
+          }
+          setParsed({
+            fileName: file.name,
+            headers: ["Subscriber Name", "Access Code", "WhatsApp", "Group Code", "Chit Value", "Prized", "Auction Day", "Duration", "Previous Bid Amount", "Share of Discount"],
+            rows: [],
+            templateRows,
+            templateMode: true,
+          });
+          setMapping({});
+          toast.success(`Detected Panasuna template — extracted ${templateRows.length} subscription rows from ${file.name}`);
+          return;
+        }
+
         const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
         rows = json.map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v == null ? "" : String(v)])));
         headers = rows.length ? Object.keys(rows[0]) : [];
@@ -118,21 +352,39 @@ function Importer() {
 
   const mappedRows: ImportRow[] = useMemo(() => {
     if (!parsed) return [];
-    return parsed.rows.map((row) => {
-      const out: any = {};
-      for (const [header, target] of Object.entries(mapping)) {
-        if (!target) continue;
-        const raw = (row[header] ?? "").toString().trim();
-        if (!raw) continue;
-        if (NUMBER_FIELDS.includes(target)) {
-          const num = Number(raw.replace(/[,\s]/g, ""));
-          out[target] = Number.isFinite(num) ? num : null;
-        } else {
-          out[target] = raw;
+    if (parsed.templateMode && parsed.templateRows) return parsed.templateRows;
+    return parsed.rows
+      .filter((row) => {
+        // Skip "Total" summary rows that have no subscriber name in any name-mapped column
+        const firstVal = Object.values(row)[0]?.toString().trim().toLowerCase();
+        return firstVal !== "total";
+      })
+      .map((row) => {
+        const out: any = {};
+        for (const [header, target] of Object.entries(mapping)) {
+          if (!target) continue;
+          const raw = (row[header] ?? "").toString().trim();
+          if (!raw) continue;
+          if (BOOLEAN_FIELDS.includes(target)) {
+            out[target] = parseBool(raw);
+          } else if (target === "durationMonths") {
+            // Period like "19/30" → 30, otherwise normal number parse
+            const period = tryParsePeriod(raw);
+            if (period != null) {
+              out[target] = period;
+            } else {
+              const num = Number(raw.replace(/[,\s]/g, ""));
+              out[target] = Number.isFinite(num) ? num : null;
+            }
+          } else if (NUMBER_FIELDS.includes(target)) {
+            const num = Number(raw.replace(/[,\s]/g, ""));
+            out[target] = Number.isFinite(num) ? num : null;
+          } else {
+            out[target] = raw;
+          }
         }
-      }
-      return out as ImportRow;
-    });
+        return out as ImportRow;
+      });
   }, [parsed, mapping]);
 
   const validation = useMemo(() => {
@@ -141,7 +393,8 @@ function Importer() {
     let dupes = 0;
     let missingName = 0;
     const required = FIELD_DEFS.find((f) => f.key === "subscriberName")!;
-    const hasNameMapping = Object.values(mapping).includes(required.key);
+    const templateMode = parsed?.templateMode === true;
+    const hasNameMapping = templateMode ? true : Object.values(mapping).includes(required.key);
     if (!hasNameMapping && parsed) {
       errors.push({ row: 0, message: `Required column "${required.label}" is not mapped.` });
     }
@@ -238,35 +491,49 @@ function Importer() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="font-semibold">{parsed.fileName}</div>
-                <div className="text-xs text-muted-foreground">{parsed.rows.length} data rows · {parsed.headers.length} columns</div>
+                <div className="text-xs text-muted-foreground">
+                  {parsed.templateMode
+                    ? `Panasuna receipt template · ${parsed.templateRows?.length ?? 0} subscription rows extracted`
+                    : `${parsed.rows.length} data rows · ${parsed.headers.length} columns`}
+                </div>
               </div>
               <Button variant="outline" onClick={reset}>Choose different file</Button>
             </div>
+            {parsed.templateMode && (
+              <div className="mt-3 rounded-md border border-emerald-300/60 bg-emerald-50/60 p-3 text-xs text-emerald-900 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200">
+                <div className="font-semibold">Detected: Panasuna multi-block receipt template</div>
+                <p className="mt-0.5">
+                  Member Code, phone, name, address and the chit table are pulled from each block. Column mapping is skipped — preview the rows below and import.
+                </p>
+              </div>
+            )}
           </Card>
 
-          <Card className="p-5">
-            <h2 className="mb-3 text-base font-semibold">Column mapping</h2>
-            <p className="mb-4 text-xs text-muted-foreground">We auto-detected matches based on column names. Adjust as needed.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {parsed.headers.map((header) => (
-                <div key={header} className="flex items-center gap-2">
-                  <Label className="w-1/2 truncate text-xs font-mono">{header}</Label>
-                  <select
-                    className="w-1/2 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                    value={mapping[header] ?? ""}
-                    onChange={(e) => setMapping((m) => ({ ...m, [header]: e.target.value as keyof ImportRow | "" }))}
-                  >
-                    <option value="">— Skip —</option>
-                    {FIELD_DEFS.map((def) => (
-                      <option key={def.key} value={def.key}>
-                        {def.label}{def.required ? " *" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </Card>
+          {!parsed.templateMode && (
+            <Card className="p-5">
+              <h2 className="mb-3 text-base font-semibold">Column mapping</h2>
+              <p className="mb-4 text-xs text-muted-foreground">We auto-detected matches based on column names. Adjust as needed.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {parsed.headers.map((header) => (
+                  <div key={header} className="flex items-center gap-2">
+                    <Label className="w-1/2 truncate text-xs font-mono">{header}</Label>
+                    <select
+                      className="w-1/2 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                      value={mapping[header] ?? ""}
+                      onChange={(e) => setMapping((m) => ({ ...m, [header]: e.target.value as keyof ImportRow | "" }))}
+                    >
+                      <option value="">— Skip —</option>
+                      {FIELD_DEFS.map((def) => (
+                        <option key={def.key} value={def.key}>
+                          {def.label}{def.required ? " *" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           <Card className="p-5">
             <h2 className="mb-2 text-base font-semibold">Preview & validation</h2>
@@ -296,7 +563,10 @@ function Importer() {
                 <thead className="bg-muted/60 uppercase">
                   <tr>
                     <th className="px-2 py-2 text-left">#</th>
-                    {FIELD_DEFS.filter((d) => Object.values(mapping).includes(d.key)).map((d) => (
+                    {(parsed.templateMode
+                      ? FIELD_DEFS.filter((d) => mappedRows.some((r) => r[d.key] != null && r[d.key] !== ""))
+                      : FIELD_DEFS.filter((d) => Object.values(mapping).includes(d.key))
+                    ).map((d) => (
                       <th key={d.key} className="px-2 py-2 text-left">{d.label}</th>
                     ))}
                   </tr>
@@ -305,7 +575,10 @@ function Importer() {
                   {mappedRows.slice(0, 25).map((row, i) => (
                     <tr key={i} className={!row.subscriberName?.trim() ? "bg-destructive/5" : ""}>
                       <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
-                      {FIELD_DEFS.filter((d) => Object.values(mapping).includes(d.key)).map((d) => (
+                      {(parsed.templateMode
+                        ? FIELD_DEFS.filter((d) => mappedRows.some((r) => r[d.key] != null && r[d.key] !== ""))
+                        : FIELD_DEFS.filter((d) => Object.values(mapping).includes(d.key))
+                      ).map((d) => (
                         <td key={d.key} className="px-2 py-1.5">{row[d.key] != null ? String(row[d.key]) : <span className="text-muted-foreground">—</span>}</td>
                       ))}
                     </tr>

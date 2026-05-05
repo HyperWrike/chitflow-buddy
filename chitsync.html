@@ -282,6 +282,33 @@ const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Math.random()
 let CUST = load(K.customers, []);
 let ENR  = load(K.enrolments, []);
 let TXN  = load(K.txns, []);
+// PANASUNA-BRIDGE: merge in demo subscribers from the parent app (set on window before this script).
+try {
+  const inj = (window).__PANASUNA_CUSTOMERS__;
+  if (Array.isArray(inj) && inj.length) {
+    const seen = new Set(CUST.filter(c => c.phone).map(c => c.phone));
+    let added = 0;
+    for (const it of inj) {
+      const phone = (it.phone || '').replace(/\D/g, '').slice(-10);
+      const key = phone || ('name:' + (it.name || '').toLowerCase());
+      if (seen.has(key)) continue;
+      seen.add(key);
+      CUST.push({
+        id: it.id || uid(),
+        name: it.name || '',
+        phone: phone,
+        phone2: it.phone2 || '',
+        address: it.address || '',
+        family_code: null,
+        linked_member_id: null,
+        source: it.source || 'panasuna',
+        created_at: it.created_at || new Date().toISOString(),
+      });
+      added++;
+    }
+    if (added) save(K.customers, CUST);
+  }
+} catch (e) { console.warn('Panasuna bridge merge failed', e); }
 let RCT  = load(K.receipts, []);
 let CHAT = load(K.chat, []);
 let CO   = load(K.co, { name:'Sri Lakshmi Chit Fund', address:'Main Road, City', phone:'+91 90000 00000' });

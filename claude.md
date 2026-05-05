@@ -42,6 +42,50 @@ The system models the application through these core tables (no substantial devi
 ## Deviations from Requirements
 - **.xlsx Uploads**: Now fully supported via SheetJS (`xlsx` package). Both `.xlsx`/`.xls` (binary) and `.csv` are parsed in-browser; no serverless handler is required. Adds ~360KB to the lazy-loaded `/import` route only.
 
+## Addendum: May 5, 2026 — Round 3 (Panasuna template parser, reminders seed, ChitSync bridge)
+
+### What changed
+- **Panasuna multi-block receipt template is now auto-detected and parsed.** [src/routes/import.tsx](src/routes/import.tsx) inspects the first 30 rows of an uploaded xlsx — if it sees "Panasuna" + "Member Code" or the canonical column header (`Auction Date` + `Prized` + `Chit Value` + `Period`), it bypasses the flat-CSV parser and runs `parsePanasunaGrid` instead. That parser:
+  - Walks the grid as a 2D array (no header row assumption).
+  - Detects Member Code (`PCPL\d+`) and Phone No anywhere in the receipt header, sets them as the block's identity.
+  - Reads `Dear Mr./Mrs./Dr.<name>` lines, strips honorifics, and uses that as the subscriber's display name.
+  - Captures address-like cells between the "Dear" line and the table header into `addressLine1`/`addressLine2`, with pincode regex extracted.
+  - On reaching the canonical table header row, builds a column index map and emits one `ImportRow` per data row beneath, until it hits a `Total` / `Grand Total` / `Previous Pending` / blank row.
+  - `Period` column ("19/30") yields `durationMonths = 30`. `Prized (Yes/No)` yields the boolean.
+  - Multiple receipts (blocks) in the same sheet are handled — the parser resets between blocks.
+  - De-dupes identical `(memberCode, groupCode)` pairs that appear twice in the same receipt.
+- **The importer UI shows a "Detected: Panasuna multi-block receipt template" banner** and hides the column-mapping panel in template mode (no manual mapping is needed). The preview table only shows columns that actually have data.
+- **Reminders dispatch list now uses the WhatsApp number from the xlsx.** Imported rows feed the demo subscriber store with the parsed phone, and the reminders page already reads `subscriber.whatsapp_number` for both the dispatch list and the "Send" action — so reminders fire to whatever phone was on the receipt template.
+- **Random demo dispatches are seeded.** `seedState()` in [src/lib/demo-data.ts](src/lib/demo-data.ts) now populates the `dispatches` table with a rotating mix of `sent` / `pending` / `failed` rows for the current month, so the Reminders page renders realistic status badges out of the box. Older browser sessions get the new fields backfilled lazily by `readState()` (no localStorage wipe needed).
+- **ChitSync now shares the same subscribers as the main app.** [src/routes/chitsync.tsx](src/routes/chitsync.tsx) maps the demo `subscribers` into ChitSync's customer schema (`id, name, phone, phone2, address, source: "panasuna"`) and injects them as `window.__PANASUNA_CUSTOMERS__` via a `<script>` tag spliced into `</head>` of the `srcDoc` HTML. A small bridge inside [chitsync.html](chitsync.html) (right after `let CUST = load(K.customers, [])`) merges those records into the iframe's local `CUST` array on every load, deduping by phone. The iframe's `key` is bumped on `subscribeDemoChanges` so any subscriber added/removed in the main app re-bootstraps the iframe with the latest set.
+
+### Known limitations of the bridge
+- The merge is one-way (parent → ChitSync). Edits made to a customer inside ChitSync stay local to the iframe's localStorage; they do not flow back to the React `subscribers` list.
+- ChitSync runs in an opaque-origin `srcDoc` iframe; its `localStorage` is per-document and not shared with the parent. Going fully two-way would require switching to a real iframe `src` (separate file) plus `postMessage` — a follow-up.
+
+### Verification
+- `npm run build` succeeds (9.24s).
+- Smoke test plan with the sample.xlsx shown by the user: open `/import`, choose the file, the importer announces "Detected: Panasuna multi-block receipt template — extracted N subscription rows", preview shows Subscriber Name = receipt holder (e.g. `Sundara Raman.S`), Access Code = `PCPL0005`, WhatsApp = `9443205630`, Group Code = `PS238`/`PS213`, Prized Yes/No mapped, Chit Value, Auction Day, Duration (from Period), Previous Bid Amount, and Share of Discount populated. Hit "Import data" → subscribers + groups + enrollments materialize. Visit `/communications/reminders` → dispatch list now includes those subscribers with their imported phone; "Send" or "Send all" logs to both DB and demo dispatches.
+- Visit `/chitsync` → the Customers tab inside the iframe lists the same subscribers (matched by phone where available) plus any extras already saved inside ChitSync.
+
+## Addendum: May 5, 2026 — Round 2 fixes (scale + reminders connectivity)
+
+### What changed
+- **Reminders are now connected to real subscribers** (was previously broken because the page only queried Supabase `monthly_entries` which is empty under RLS). Added a demo `monthly_entries` seed (one entry per active group for the current month) and a `dispatches` log inside the local demo store. `communications.reminders.tsx` falls through to demo when the DB returns nothing — same pattern as receipts already used. "Send" actions log to both DB (best-effort) and demo, and re-render via `useDemoSync`.
+- **Receipts subscriber search & detail also fall back to demo data** when Supabase is empty. The receipts module now matches the same connectivity guarantee that the reminders module just gained.
+- **Auto-generated access codes.** Opening "Add Subscriber" pre-fills `access_code` with the next sequential `PCPL####`. The user can override. Implemented via `peekNextAccessCode()` in [src/lib/demo-data.ts](src/lib/demo-data.ts).
+- **Group enrollment at subscriber creation.** The Add Subscriber dialog now shows a checkbox list of active chit groups; checked groups are enrolled immediately after the subscriber is saved. Toast confirms the new code and group count.
+- **Filters + pagination on Subscribers page** for thousands of records. Added: search box, group dropdown filter, status filter (active/inactive/all), "Clear filters" button, and 50-per-page pagination with prev/next controls + "Showing X–Y of N" indicator. Header count now reflects filtered/total.
+- **Importer now recognizes the Panasuna receipt template format.** Added column aliases for `Auction Date`, `Group`, `Prized (Yes/No)`, `Chit Value`, `Previous Bid Amount`, `Share of Discount`, `Period`, `Chit Amount (After Incentive)`, `Member Code`, etc. New parsers: boolean parsing for `prized`, `Period` parsing ("19/30" → 30 months), automatic skip of summary rows whose first cell is "Total". `prized` flag is honored when creating subscriptions.
+
+### Why some things were not fixed end-to-end in this round
+- **AI assistant tools** (`src/lib/ai-tools.ts`) still talk only to Supabase. Refactoring 20+ tool definitions to fall back to the demo store is a larger surgery deferred to a follow-up. The chat surface still works — the model just sees empty result sets when the DB is RLS-blocked. Pointing the project at a writable Supabase (service role key or relaxed RLS) is the cleaner unlock.
+- **ChitSync workspace data sync.** The embedded `chitsync.html` is a self-contained HTML+JS workspace. Bridging it to the React subscriber store would require either rewriting the iframe to consume `panasuna_demo_state_v1` from `localStorage` (cross-origin issues with `srcDoc`) or passing data via `postMessage`. Deferred to a focused follow-up.
+
+### Verification
+- `npm run build` succeeds (8.85s, all 2037 modules transformed).
+- Smoke-tested: Subscribers list now paginates beyond 50 rows, group filter restricts to a single group's members, "Add Subscriber" auto-fills the next code and the new subscriber's groups appear immediately on the list and on the group detail page. Reminders now load rows for the demo dataset and "Send all" populates dispatch status badges.
+
 ## Addendum: May 5, 2026 — End-to-end completion
 
 ### What changed

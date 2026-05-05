@@ -14,11 +14,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
+  addDemoSubscription,
   deleteDemoSubscriber,
   ensureDemoState,
+  getDemoGroups,
   getDemoSubscriberPayload,
+  peekNextAccessCode,
   saveDemoSubscriber,
 } from "@/lib/demo-data";
+import type { ChitGroup } from "@/lib/db-types";
 import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/subscribers")({
@@ -34,9 +38,16 @@ function SubscribersPage() {
   );
 }
 
+const PAGE_SIZE = 50;
+
 function Subscribers() {
   const [search, setSearch] = useState("");
+  const [groupFilter, setGroupFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [page, setPage] = useState(1);
   const qc = useQueryClient();
+
+  React.useEffect(() => { setPage(1); }, [search, groupFilter, statusFilter]);
 
   useDemoSync([["subscribers"]]);
 
@@ -80,8 +91,25 @@ function Subscribers() {
     },
   });
 
-  const filtered = (list.data ?? []).filter((s) => {
-    const q = search.toLowerCase();
+  const allRows = list.data ?? [];
+  const groupOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const s of allRows) {
+      for (const sub of s.subscriptions ?? []) {
+        if (sub.chit_groups?.group_code) set.add(sub.chit_groups.group_code);
+      }
+    }
+    return Array.from(set).sort();
+  }, [allRows]);
+
+  const filtered = allRows.filter((s) => {
+    if (statusFilter === "active" && !s.active) return false;
+    if (statusFilter === "inactive" && s.active) return false;
+    if (groupFilter) {
+      const codes = (s.subscriptions ?? []).map((x) => x.chit_groups?.group_code);
+      if (!codes.includes(groupFilter)) return false;
+    }
+    const q = search.toLowerCase().trim();
     return (
       !q ||
       s.name.toLowerCase().includes(q) ||
@@ -90,24 +118,56 @@ function Subscribers() {
     );
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Subscribers</h1>
-          <p className="text-sm text-muted-foreground">{list.data?.length ?? 0} total</p>
+          <p className="text-sm text-muted-foreground">
+            {filtered.length === allRows.length
+              ? `${allRows.length} total`
+              : `${filtered.length} of ${allRows.length} matching`}
+          </p>
         </div>
         <SubscriberDialog />
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by name, code, or phone..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, code, or phone..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={groupFilter}
+          onChange={(e) => setGroupFilter(e.target.value)}
+        >
+          <option value="">All groups</option>
+          {groupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <select
+          className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+        >
+          <option value="all">All status</option>
+          <option value="active">Active only</option>
+          <option value="inactive">Inactive only</option>
+        </select>
+        {(search || groupFilter || statusFilter !== "all") && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter(""); setStatusFilter("all"); }}>
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {!list.isLoading && (list.data?.length ?? 0) === 0 && (
@@ -146,7 +206,7 @@ function Subscribers() {
               {!list.isLoading && filtered.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No subscribers found.</td></tr>
               )}
-              {filtered.map((s) => (
+              {visible.map((s) => (
                 <tr key={s.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-mono text-xs">{s.access_code}</td>
                   <td className="px-4 py-3 font-medium">
@@ -199,6 +259,18 @@ function Subscribers() {
             </tbody>
           </table>
         </div>
+        {filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+            <div>
+              Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={safePage === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</Button>
+              <span>Page {safePage} of {totalPages}</span>
+              <Button variant="outline" size="sm" disabled={safePage === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Outlet />
@@ -213,6 +285,23 @@ function SubscriberDialog({ existing }: { existing?: Subscriber }) {
   const [form, setForm] = useState<Partial<Subscriber>>(
     existing ?? { city: "Salem", active: true },
   );
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (open && !existing && !form.access_code) {
+      setForm((prev) => ({ ...prev, access_code: peekNextAccessCode() }));
+    }
+  }, [open, existing, form.access_code]);
+
+  const groupsQ = useQuery({
+    queryKey: ["all-groups-for-subscriber-create"],
+    queryFn: async () => {
+      const { data } = await db.from("chit_groups").select("id, group_code, agreement_no, chit_value, duration_months, auction_day, auction_time, commission_rate, start_month, status").eq("status", "active").order("group_code");
+      if (!data?.length) return getDemoGroups().filter((g) => g.status === "active");
+      return data as ChitGroup[];
+    },
+    enabled: open && !existing,
+  });
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,8 +324,23 @@ function SubscriberDialog({ existing }: { existing?: Subscriber }) {
         toast.success("Subscriber updated");
       } else {
         await db.from("subscribers").insert(payload);
-        saveDemoSubscriber(payload);
-        toast.success("Subscriber added");
+        const created = saveDemoSubscriber(payload);
+        if (groupIds.length) {
+          for (const gid of groupIds) {
+            await db.from("subscriptions").insert({
+              subscriber_id: created.id, group_id: gid,
+              name_on_chit: created.name, seat_count: 1,
+            });
+            addDemoSubscription({
+              subscriber_id: created.id, group_id: gid,
+              name_on_chit: created.name, seat_count: 1,
+            });
+          }
+        }
+        toast.success(
+          `Added ${created.name} (${created.access_code})${groupIds.length ? ` · enrolled in ${groupIds.length} group${groupIds.length === 1 ? "" : "s"}` : ""}`,
+        );
+        setGroupIds([]);
       }
       qc.invalidateQueries({ queryKey: ["subscribers"] });
       setOpen(false);
@@ -265,6 +369,7 @@ function SubscriberDialog({ existing }: { existing?: Subscriber }) {
             <div>
               <Label>Access Code *</Label>
               <Input required value={form.access_code ?? ""} onChange={(e) => setForm({ ...form, access_code: e.target.value })} placeholder="PCPL0031" />
+              {!existing && <p className="mt-1 text-[10px] text-muted-foreground">Auto-generated. Edit if you need a custom code.</p>}
             </div>
             <div>
               <Label>WhatsApp # *</Label>
@@ -301,6 +406,32 @@ function SubscriberDialog({ existing }: { existing?: Subscriber }) {
             <Switch checked={form.active ?? true} onCheckedChange={(v) => setForm({ ...form, active: v })} />
             <Label>Active</Label>
           </div>
+          {!existing && (
+            <div>
+              <Label>Enroll in Chit Groups</Label>
+              <p className="mb-1 text-xs text-muted-foreground">Optional — pick the groups this subscriber should be enrolled in right away.</p>
+              <div className="max-h-44 overflow-y-auto rounded-md border bg-background p-2 text-sm">
+                {(groupsQ.data ?? []).length === 0 && <p className="px-2 py-1 text-xs text-muted-foreground">No active groups available.</p>}
+                {(groupsQ.data ?? []).map((g) => (
+                  <label key={g.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
+                    <input
+                      type="checkbox"
+                      checked={groupIds.includes(g.id)}
+                      onChange={() =>
+                        setGroupIds((prev) => (prev.includes(g.id) ? prev.filter((x) => x !== g.id) : [...prev, g.id]))
+                      }
+                    />
+                    <span className="font-mono text-xs text-muted-foreground">{g.group_code}</span>
+                    <span className="truncate">{g.agreement_no ?? ""}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{g.chit_value.toLocaleString("en-IN")} · {g.duration_months}m</span>
+                  </label>
+                ))}
+              </div>
+              {groupIds.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">{groupIds.length} group{groupIds.length === 1 ? "" : "s"} selected.</p>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button type="submit" disabled={busy}>{existing ? "Save" : "Add"}</Button>
           </DialogFooter>

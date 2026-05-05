@@ -8,6 +8,13 @@ import { currentMonth, formatINR, formatDateDMY, formatMonth } from "@/lib/forma
 import { computeGroupTotals, computeMemberDue } from "@/lib/calculator";
 import { printElement } from "@/lib/printable";
 import { toast } from "sonner";
+import {
+  getDemoGroups,
+  getDemoMonthlyEntries,
+  getDemoSubscribers,
+  getDemoSubscriptions,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/communications/receipts")({
   component: () => (
@@ -31,15 +38,32 @@ function ReceiptsPage() {
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
+  useDemoSync([["subs-search"], ["sub-receipt-detail"]]);
+
   const subs = useQuery({
     queryKey: ["subs-search", search],
     queryFn: async () => {
-      const q = db.from("subscribers").select("id, access_code, name, whatsapp_number, address_line1, address_line2, city, pincode").eq("active", true).limit(20);
+      const q = db.from("subscribers").select("id, access_code, name, whatsapp_number, address_line1, address_line2, city, pincode").eq("active", true).limit(50);
       if (search.trim()) {
         q.or(`name.ilike.%${search}%,access_code.ilike.%${search}%,whatsapp_number.ilike.%${search}%`);
       }
-      const { data, error } = await q;
-      if (error) throw error;
+      const { data } = await q;
+      if (!data?.length) {
+        const term = search.trim().toLowerCase();
+        const local = getDemoSubscribers()
+          .filter((s) => s.active)
+          .filter((s) =>
+            !term ||
+            s.name.toLowerCase().includes(term) ||
+            s.access_code.toLowerCase().includes(term) ||
+            s.whatsapp_number.includes(term),
+          )
+          .slice(0, 50)
+          .map(({ id, access_code, name, whatsapp_number, address_line1, address_line2, city, pincode }) => ({
+            id, access_code, name, whatsapp_number, address_line1, address_line2, city, pincode,
+          }));
+        return local as SubscriberLite[];
+      }
       return data as SubscriberLite[];
     },
     enabled: !selectedSub,
@@ -49,25 +73,45 @@ function ReceiptsPage() {
     queryKey: ["sub-receipt-detail", selectedSub?.id, month],
     enabled: !!selectedSub,
     queryFn: async () => {
-      const { data: subscriptions } = await db
+      const { data: dbSubscriptions } = await db
         .from("subscriptions")
         .select("id, seat_count, prized, group_id, name_on_chit, chit_groups!inner(id, group_code, chit_value, duration_months, commission_rate, status)")
         .eq("subscriber_id", selectedSub!.id)
         .eq("active", true);
-      if (!subscriptions) return [];
+
+      let subscriptions: any[] = dbSubscriptions ?? [];
+      if (!subscriptions.length) {
+        const localSubs = getDemoSubscriptions().filter((s) => s.subscriber_id === selectedSub!.id && s.active !== false);
+        const localGroups = getDemoGroups();
+        subscriptions = localSubs.map((s) => {
+          const g = localGroups.find((x) => x.id === s.group_id);
+          if (!g) return null;
+          return {
+            id: s.id, seat_count: s.seat_count, prized: s.prized, group_id: s.group_id, name_on_chit: s.name_on_chit,
+            chit_groups: { id: g.id, group_code: g.group_code, chit_value: g.chit_value, duration_months: g.duration_months, commission_rate: g.commission_rate, status: g.status },
+          };
+        }).filter(Boolean);
+      }
+      if (!subscriptions.length) return [];
 
       const groupIds = subscriptions.map((s: any) => s.group_id);
-      const { data: entries } = await db
+      const { data: dbEntries } = await db
         .from("monthly_entries")
         .select("id, group_id, winning_bid")
         .eq("month", month)
         .in("group_id", groupIds);
+      const entries = dbEntries?.length
+        ? dbEntries
+        : getDemoMonthlyEntries(month).filter((e) => groupIds.includes(e.group_id)).map((e) => ({ id: e.id, group_id: e.group_id, winning_bid: e.winning_bid }));
 
-      const { data: allSubs } = await db
+      const { data: dbAllSubs } = await db
         .from("subscriptions")
         .select("group_id, seat_count")
         .in("group_id", groupIds)
         .eq("active", true);
+      const allSubs = dbAllSubs?.length
+        ? dbAllSubs
+        : getDemoSubscriptions().filter((s) => groupIds.includes(s.group_id) && s.active !== false).map((s) => ({ group_id: s.group_id, seat_count: s.seat_count }));
 
       return subscriptions.map((s: any) => {
         const grp = s.chit_groups;
@@ -190,7 +234,12 @@ function ReceiptsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <div className="mt-3 max-h-96 overflow-auto rounded-lg border divide-y">
+              <div className="mt-2 text-xs text-muted-foreground">
+                {subs.data ? (
+                  <>Showing {subs.data.length} {search.trim() ? "matching" : "active"} subscriber{subs.data.length === 1 ? "" : "s"}{subs.data.length === 50 ? " (refine search to narrow)" : ""}</>
+                ) : "Loading…"}
+              </div>
+              <div className="mt-2 max-h-96 overflow-auto rounded-lg border divide-y">
                 {(subs.data ?? []).map((s) => (
                   <button
                     key={s.id}
