@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
+import { useEffect } from "react";
 import chitSyncHtml from "../../chitsync.html?raw";
+import { ensureDemoState } from "@/lib/demo-data";
 
 export const Route = createFileRoute("/chitsync")({
   component: ChitSyncPage,
@@ -8,6 +10,10 @@ export const Route = createFileRoute("/chitsync")({
 });
 
 function ChitSyncPage() {
+  useEffect(() => {
+    ensureDemoState();
+  }, []);
+
   return (
     <ProtectedLayout>
       <div className="space-y-4">

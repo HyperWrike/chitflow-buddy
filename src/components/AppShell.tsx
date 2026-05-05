@@ -17,6 +17,7 @@ import {
   Crown,
   Menu,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -36,6 +37,7 @@ const NAV_MAIN: NavItem[] = [
   { to: "/subscribers", label: "Subscribers", icon: Users },
   { to: "/groups", label: "Chit Groups", icon: Layers3 },
   { to: "/data-entry", label: "Data Entry", icon: ClipboardList, badgeTone: "warn" },
+  { to: "/import", label: "Import", icon: Upload },
 ];
 
 const NAV_COMM: NavItem[] = [
@@ -61,6 +63,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/templates": "Templates",
   "/settings": "Settings",
   "/chitsync": "ChitSync",
+  "/import": "Import Data",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {

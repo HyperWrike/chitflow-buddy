@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { db, type ChitGroup } from "@/lib/db-types";
@@ -14,6 +14,15 @@ import { Label } from "@/components/ui/label";
 import React from "react";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
+import {
+  addDemoSubscription,
+  deleteDemoGroup,
+  ensureDemoState,
+  getDemoGroups,
+  getDemoSubscribers,
+  saveDemoGroup,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/groups")({
   component: GroupsPage,
@@ -30,7 +39,10 @@ function Groups() {
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
 
+  useDemoSync([["groups"]]);
+
   React.useEffect(() => {
+    ensureDemoState();
     const channel = db.channel(`groups-changes`)
       .on(
         'postgres_changes',
@@ -48,7 +60,7 @@ function Groups() {
     queryKey: ["groups"],
     queryFn: async () => {
       const { data, error } = await db.from("chit_groups").select("*").order("group_code");
-      if (error) throw error;
+      if (error || !data?.length) return getDemoGroups();
       return data as ChitGroup[];
     },
   });
@@ -108,13 +120,32 @@ function Groups() {
                   <td className="px-4 py-3">Day {g.auction_day}{g.auction_time ? ` · ${g.auction_time}` : ""}</td>
                   <td className="px-4 py-3 text-right">{g.commission_rate}%</td>
                   <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${g.status === "active" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>{g.status}</span></td>
-                  <td className="px-4 py-3 text-right"><GroupDialog existing={g} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="inline-flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={async () => {
+                        if (!confirm(`Delete group ${g.group_code}? This removes its memberships too.`)) return;
+                        try {
+                          await db.from("chit_groups").delete().eq("id", g.id);
+                          deleteDemoGroup(g.id);
+                          toast.success("Group deleted");
+                          qc.invalidateQueries({ queryKey: ["groups"] });
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Failed to delete group");
+                        }
+                      }}>
+                        <span className="text-destructive">Delete</span>
+                      </Button>
+                      <GroupDialog existing={g} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      <Outlet />
     </div>
   );
 }
@@ -126,6 +157,19 @@ function GroupDialog({ existing }: { existing?: ChitGroup }) {
   const [form, setForm] = useState<Partial<ChitGroup>>(
     existing ?? { commission_rate: 5, status: "active", auction_time: "5:00 PM" },
   );
+  const [initialSubs, setInitialSubs] = useState<string[]>([]);
+  const allSubs = useQuery({
+    queryKey: ["all-subscribers-for-group-create"],
+    queryFn: async () => {
+      const { data } = await db.from("subscribers").select("id, name, access_code").eq("active", true).order("name");
+      if (!data?.length) return getDemoSubscribers().filter((s) => s.active).map((s) => ({ id: s.id, name: s.name, access_code: s.access_code }));
+      return data;
+    },
+    enabled: open && !existing,
+  });
+
+  const toggleSub = (id: string) =>
+    setInitialSubs((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,13 +187,33 @@ function GroupDialog({ existing }: { existing?: ChitGroup }) {
         status: form.status ?? "active",
       };
       if (existing) {
-        const { error } = await db.from("chit_groups").update(payload).eq("id", existing.id);
-        if (error) throw error;
+        await db.from("chit_groups").update(payload).eq("id", existing.id);
+        saveDemoGroup(payload, existing.id);
         toast.success("Group updated");
       } else {
-        const { error } = await db.from("chit_groups").insert(payload);
-        if (error) throw error;
-        toast.success("Group added");
+        await db.from("chit_groups").insert(payload);
+        const created = saveDemoGroup(payload);
+
+        if (initialSubs.length) {
+          const allSubsList = allSubs.data ?? getDemoSubscribers();
+          for (const sid of initialSubs) {
+            const sub = allSubsList.find((s) => s.id === sid);
+            await db.from("subscriptions").insert({
+              subscriber_id: sid,
+              group_id: created.id,
+              name_on_chit: sub?.name ?? "",
+              seat_count: 1,
+            });
+            addDemoSubscription({
+              subscriber_id: sid,
+              group_id: created.id,
+              name_on_chit: sub?.name ?? "",
+              seat_count: 1,
+            });
+          }
+        }
+        toast.success(`Group added${initialSubs.length ? ` with ${initialSubs.length} member${initialSubs.length === 1 ? "" : "s"}` : ""}`);
+        setInitialSubs([]);
       }
       qc.invalidateQueries({ queryKey: ["groups"] });
       setOpen(false);
@@ -191,6 +255,25 @@ function GroupDialog({ existing }: { existing?: ChitGroup }) {
               </select>
             </div>
           </div>
+          {!existing && (
+            <div>
+              <Label>Initial Subscribers</Label>
+              <p className="mb-1 text-xs text-muted-foreground">Optional — pick subscribers to enroll right away.</p>
+              <div className="max-h-40 overflow-y-auto rounded-md border bg-background p-2 text-sm">
+                {(allSubs.data ?? []).length === 0 && <p className="text-xs text-muted-foreground">No subscribers available.</p>}
+                {(allSubs.data ?? []).map((s) => (
+                  <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-muted/40">
+                    <input type="checkbox" checked={initialSubs.includes(s.id)} onChange={() => toggleSub(s.id)} />
+                    <span className="font-mono text-xs text-muted-foreground">{s.access_code}</span>
+                    <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+              {initialSubs.length > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">{initialSubs.length} subscriber{initialSubs.length === 1 ? "" : "s"} will be enrolled.</p>
+              )}
+            </div>
+          )}
           <DialogFooter><Button type="submit" disabled={busy}>{existing ? "Save" : "Add"}</Button></DialogFooter>
         </form>
       </DialogContent>

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { db, type Subscriber } from "@/lib/db-types";
@@ -13,6 +13,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import {
+  deleteDemoSubscriber,
+  ensureDemoState,
+  getDemoSubscriberPayload,
+  saveDemoSubscriber,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/subscribers")({
   component: SubscribersPage,
@@ -31,8 +38,11 @@ function Subscribers() {
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
 
+  useDemoSync([["subscribers"]]);
+
   // Subscribe to real-time changes
   React.useEffect(() => {
+    ensureDemoState();
     const channel = db.channel('schema-db-changes')
       .on(
         'postgres_changes',
@@ -63,7 +73,9 @@ function Subscribers() {
         .from("subscribers")
         .select("*, subscriptions(id, chit_groups(group_code))")
         .order("name");
-      if (error) throw error;
+      if (error || !data?.length) {
+        return getDemoSubscriberPayload();
+      }
       return data as (Subscriber & { subscriptions: { id: string, chit_groups: { group_code: string } }[] })[];
     },
   });
@@ -158,7 +170,29 @@ function Subscribers() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <SubscriberDialog existing={s} />
+                    <div className="inline-flex gap-2">
+                      <SubscriberDialog existing={s} />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          if (!confirm(`Delete ${s.name}? This cannot be undone.`)) return;
+                          try {
+                            const { error } = await db.from("subscribers").delete().eq("id", s.id);
+                            if (!error) await db.from("subscriptions").delete().eq("subscriber_id", s.id);
+                            // Always cascade to demo state (it's the source of truth when DB is empty/RLS-blocked).
+                            deleteDemoSubscriber(s.id);
+                            qc.invalidateQueries({ queryKey: ["subscribers"] });
+                            toast.success("Subscriber deleted");
+                          } catch (err) {
+                            console.error(err);
+                            toast.error("Failed to delete subscriber");
+                          }
+                        }}
+                      >
+                        <span className="text-destructive">Delete</span>
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -166,6 +200,8 @@ function Subscribers() {
           </table>
         </div>
       </Card>
+
+      <Outlet />
     </div>
   );
 }
@@ -194,12 +230,12 @@ function SubscriberDialog({ existing }: { existing?: Subscriber }) {
         active: form.active ?? true,
       };
       if (existing) {
-        const { error } = await db.from("subscribers").update(payload).eq("id", existing.id);
-        if (error) throw error;
+        await db.from("subscribers").update(payload).eq("id", existing.id);
+        saveDemoSubscriber(payload, existing.id);
         toast.success("Subscriber updated");
       } else {
-        const { error } = await db.from("subscribers").insert(payload);
-        if (error) throw error;
+        await db.from("subscribers").insert(payload);
+        saveDemoSubscriber(payload);
         toast.success("Subscriber added");
       }
       qc.invalidateQueries({ queryKey: ["subscribers"] });

@@ -7,6 +7,11 @@ import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/format";
+import {
+  ensureDemoState,
+  getDemoSubscriberDetail,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/subscribers/$id")({
   component: SubscriberDetailPage,
@@ -24,9 +29,11 @@ function SubscriberDetailPage() {
 function Detail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  useDemoSync([["subscriber", id], ["subscriptions-for-subscriber", id]]);
 
   // Subscribe to real-time changes
   React.useEffect(() => {
+    ensureDemoState();
     const channel = db.channel(`subscriber-changes-${id}`)
       .on(
         'postgres_changes',
@@ -49,7 +56,7 @@ function Detail() {
     queryKey: ["subscriber", id],
     queryFn: async () => {
       const { data, error } = await db.from("subscribers").select("*").eq("id", id).single();
-      if (error) throw error;
+      if (error || !data ) return getDemoSubscriberDetail(id);
       return data;
     },
   });
@@ -61,7 +68,9 @@ function Detail() {
         .from("subscriptions")
         .select("*, chit_groups!inner(group_code, chit_value, auction_day, duration_months)")
         .eq("subscriber_id", id);
-      if (error) throw error;
+      if (error || !data?.length ) {
+        return getDemoSubscriberDetail(id)?.subscriptions ?? [];
+      }
       return data;
     },
   });
@@ -129,9 +138,17 @@ function Detail() {
                 <td className="px-4 py-3 text-right">{formatINR(s.chit_groups.chit_value)}</td>
                 <td className="px-4 py-3">Day {s.chit_groups.auction_day}</td>
                 <td className="px-4 py-3">
-                  {s.prized
-                    ? <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-semibold text-gold-foreground">Prized {s.prized_month ?? ""}</span>
-                    : <span className="text-xs text-muted-foreground">Active</span>}
+                  {(() => {
+                    const status = s.prized ? "completed" : s.active === false ? "pending" : "active";
+                    const cls =
+                      status === "completed"
+                        ? "bg-gold/20 text-gold-foreground"
+                        : status === "pending"
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-success/15 text-success";
+                    const label = status === "completed" ? `Completed${s.prized_month ? ` ${s.prized_month}` : ""}` : status === "pending" ? "Pending" : "Active";
+                    return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{label}</span>;
+                  })()}
                 </td>
               </tr>
             ))}

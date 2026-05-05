@@ -4,13 +4,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { db } from "@/lib/db-types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
+import {
+  addDemoSubscription,
+  deleteDemoSubscription,
+  ensureDemoState,
+  getDemoGroupDetail,
+  getDemoSubscribers,
+} from "@/lib/demo-data";
+import { useDemoSync } from "@/lib/use-demo-sync";
 
 export const Route = createFileRoute("/groups/$id")({
   component: GroupDetailPage,
@@ -24,9 +32,12 @@ function GroupDetailPage() {
 function Detail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const [memberSearch, setMemberSearch] = useState("");
+  useDemoSync([["group", id], ["group-members", id]]);
 
   // Subscribe to real-time changes
   React.useEffect(() => {
+    ensureDemoState();
     const channel = db.channel(`group-changes-${id}`)
       .on(
         'postgres_changes',
@@ -49,7 +60,7 @@ function Detail() {
     queryKey: ["group", id],
     queryFn: async () => {
       const { data, error } = await db.from("chit_groups").select("*").eq("id", id).single();
-      if (error) throw error;
+      if (error || !data) return getDemoGroupDetail(id);
       return data;
     },
   });
@@ -61,17 +72,32 @@ function Detail() {
         .from("subscriptions")
         .select("*, subscribers!inner(name, access_code, whatsapp_number)")
         .eq("group_id", id);
-      if (error) throw error;
+      if (error || !data?.length) {
+        const demo = getDemoGroupDetail(id);
+        return demo?.members ?? [];
+      }
       return data;
     },
   });
 
   const remove = async (subId: string) => {
     if (!confirm("Remove this member from the group?")) return;
-    const { error } = await db.from("subscriptions").delete().eq("id", subId);
-    if (error) toast.error(error.message);
-    else { toast.success("Removed"); qc.invalidateQueries({ queryKey: ["group-members", id] }); }
+    await db.from("subscriptions").delete().eq("id", subId);
+    deleteDemoSubscription(subId);
+    toast.success("Removed");
+    qc.invalidateQueries({ queryKey: ["group-members", id] });
   };
+
+  const filteredMembers = (members.data ?? []).filter((m: any) => {
+    const q = memberSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      m.subscribers?.name?.toLowerCase().includes(q) ||
+      m.subscribers?.access_code?.toLowerCase().includes(q) ||
+      m.subscribers?.whatsapp_number?.includes(q) ||
+      m.name_on_chit?.toLowerCase().includes(q)
+    );
+  });
 
   if (grp.isLoading) return <div>Loading...</div>;
   if (!grp.data) return <div>Not found.</div>;
@@ -100,8 +126,17 @@ function Detail() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="border-b px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
           <h2 className="text-base font-semibold">Members ({members.data?.length ?? 0})</h2>
+          <div className="relative w-full max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Search by name, code, phone..."
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+            />
+          </div>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
@@ -118,7 +153,10 @@ function Detail() {
             {(members.data ?? []).length === 0 && (
               <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No members yet.</td></tr>
             )}
-            {(members.data ?? []).map((m: any) => (
+            {(members.data ?? []).length > 0 && filteredMembers.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No members match "{memberSearch}".</td></tr>
+            )}
+            {filteredMembers.map((m: any) => (
               <tr key={m.id}>
                 <td className="px-4 py-3 font-mono text-xs">{m.subscribers.access_code}</td>
                 <td className="px-4 py-3 font-medium">
@@ -154,8 +192,10 @@ function AddMemberDialog({ groupId }: { groupId: string }) {
   const subs = useQuery({
     queryKey: ["all-subscribers"],
     queryFn: async () => {
-      const { data, error } = await db.from("subscribers").select("id, name, access_code").eq("active", true).order("name");
-      if (error) throw error;
+      const { data } = await db.from("subscribers").select("id, name, access_code").eq("active", true).order("name");
+      if (!data?.length) {
+        return getDemoSubscribers().filter((s) => s.active).map((s) => ({ id: s.id, name: s.name, access_code: s.access_code }));
+      }
       return data;
     },
     enabled: open,
@@ -165,11 +205,11 @@ function AddMemberDialog({ groupId }: { groupId: string }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const { error } = await db.from("subscriptions").insert({
+      await db.from("subscriptions").insert({
         subscriber_id: subscriberId, group_id: groupId,
         name_on_chit: nameOnChit, seat_count: seats,
       });
-      if (error) throw error;
+      addDemoSubscription({ subscriber_id: subscriberId, group_id: groupId, name_on_chit: nameOnChit, seat_count: seats });
       toast.success("Member added");
       qc.invalidateQueries({ queryKey: ["group-members", groupId] });
       setOpen(false);
