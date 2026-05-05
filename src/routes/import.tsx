@@ -137,13 +137,30 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
   };
 
   const get = (row: string[], cm: Record<string, number>, ...keys: string[]) => {
+    const normKey = (v: string) => String(v).toLowerCase().trim().replace(/\s+/g, " ");
+
+    // Exact key match first.
     for (const k of keys) {
-      const idx = cm[k];
+      const idx = cm[normKey(k)];
       if (idx != null && row[idx] != null) {
         const v = String(row[idx]).trim();
         if (v) return v;
       }
     }
+
+    // Fallback to fuzzy/contains match for template header variations.
+    const entries = Object.entries(cm);
+    for (const rawKey of keys) {
+      const nk = normKey(rawKey);
+      const matched = entries.find(([header]) => header.includes(nk) || nk.includes(header));
+      if (!matched) continue;
+      const idx = matched[1];
+      if (idx != null && row[idx] != null) {
+        const v = String(row[idx]).trim();
+        if (v) return v;
+      }
+    }
+
     return "";
   };
 
@@ -221,7 +238,7 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
         continue;
       }
       const cm = block.columnMap!;
-      const groupCode = get(row, cm, "group");
+      const groupCode = get(row, cm, "group", "group code", "chit group", "scheme", "chit code");
       const subscriberOnRow = get(row, cm, "subscriber name");
       if (!groupCode && !subscriberOnRow) continue;
 
@@ -315,6 +332,9 @@ function Importer() {
           if (!templateRows.length) {
             toast.error("Template detected but no subscriber rows could be extracted.");
             return;
+          }
+          if (!templateRows.some((r) => (r.groupCode || "").trim())) {
+            toast.warning("Template parsed, but no group codes were found. Check header names in the source file.");
           }
           setParsed({
             fileName: file.name,
