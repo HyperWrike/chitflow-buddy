@@ -3,8 +3,9 @@ import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/db-types";
-import { Building2, MessageSquare, Clock, Save, TestTube2 } from "lucide-react";
+import { Building2, MessageSquare, Clock, Save, TestTube2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { clearAllDemoData, clearImportedData } from "@/lib/demo-data";
 
 export const Route = createFileRoute("/settings")({
   component: () => (
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/settings")({
   head: () => ({ meta: [{ title: "Settings — Panasuna Chits" }] }),
 });
 
-type Tab = "company" | "whatsapp" | "scheduler";
+type Tab = "company" | "whatsapp" | "scheduler" | "data";
 
 function SettingsPage() {
   const [tab, setTab] = useState<Tab>("company");
@@ -81,6 +82,7 @@ function SettingsPage() {
         <TabBtn active={tab === "company"} onClick={() => setTab("company")} Icon={Building2}>Company Profile</TabBtn>
         <TabBtn active={tab === "whatsapp"} onClick={() => setTab("whatsapp")} Icon={MessageSquare}>WhatsApp Integration</TabBtn>
         <TabBtn active={tab === "scheduler"} onClick={() => setTab("scheduler")} Icon={Clock}>Scheduler</TabBtn>
+        <TabBtn active={tab === "data"} onClick={() => setTab("data")} Icon={Trash2}>Data Management</TabBtn>
       </div>
 
       <div className="rounded-xl border bg-surface p-6 max-w-2xl">
@@ -163,10 +165,53 @@ function SettingsPage() {
           </div>
         )}
 
+        {tab === "data" && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Use these options to reset or clean up demo data in your browser's local storage.</p>
+            
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4 space-y-3">
+              <h3 className="font-medium text-red-900">⚠️ Danger zone</h3>
+              <button
+                onClick={() => {
+                  if (confirm("Clear only imported data? Seeded demo data will remain.")) {
+                    clearImportedData();
+                    qc.invalidateQueries();
+                    toast.success("Imported data cleared");
+                  }
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-100 px-4 py-2.5 text-sm font-medium text-red-900 hover:bg-red-200"
+              >
+                <Trash2 className="h-4 w-4" /> Clear imported data
+              </button>
+              <p className="text-xs text-red-800">Removes all subscribers and groups imported from XLSX files. Re-import your file if needed.</p>
+            </div>
+
+            <div className="rounded-lg bg-rose-50 border border-rose-300 p-4 space-y-3">
+              <h3 className="font-medium text-rose-900">🔥 Factory reset</h3>
+              <button
+                onClick={() => {
+                  if (confirm("Delete ALL demo data and reset to clean state? This cannot be undone.")) {
+                    clearAllDemoData();
+                    qc.invalidateQueries();
+                    toast.success("All demo data cleared. Refreshing...");
+                    setTimeout(() => window.location.reload(), 500);
+                  }
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-rose-100 px-4 py-2.5 text-sm font-medium text-rose-900 hover:bg-rose-200"
+              >
+                <Trash2 className="h-4 w-4" /> Factory reset
+              </button>
+              <p className="text-xs text-rose-800">Clears all subscribers, groups, imports, and dispatches. Re-import fresh XLSX to start over.</p>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 pt-4 border-t flex justify-end">
-          <button onClick={save} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
-            <Save className="h-4 w-4" /> Save changes
-          </button>
+          {tab !== "data" && (
+            <button onClick={save} disabled={busy} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+              <Save className="h-4 w-4" /> Save changes
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -582,6 +582,25 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
   return summary;
 };
 
+export const clearAllDemoData = () => {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(DEMO_KEY);
+  const fresh = seedState();
+  window.localStorage.setItem(DEMO_KEY, JSON.stringify(fresh));
+  window.dispatchEvent(new CustomEvent(DEMO_EVENT));
+};
+
+export const clearImportedData = () => {
+  const state = readState();
+  const seedStatements = (state.statements ?? []).filter((s) => s.source === "seed");
+  writeState({
+    ...state,
+    statements: seedStatements,
+    // Keep only subscribers and groups that are used by seeded statements
+    subscriptions: state.subscriptions,
+  });
+};
+
 export const isRlsError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error ?? "");
   return message.includes("row-level security") || message.includes("42501");
