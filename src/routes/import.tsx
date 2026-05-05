@@ -99,6 +99,8 @@ const PANASUNA_MONTHS: Record<string, string> = {
   december: "12",
 };
 
+const PANASUNA_ADDRESS_SKIP = /^(intimation|screenshot after payment is|member code|phone no|panasuna chits|rosci institution|good day wishes|kindly note|auction time|auction date|time|agree#|group|subscriber name|prized|chit value|previous bid amount|cc|share of discount|period|chit amount|total|grand total|previous pending|balance|pending|outstanding)$/i;
+
 function looksLikePanasunaTemplate(grid: string[][]): boolean {
   const flat = grid
     .slice(0, 30)
@@ -308,9 +310,12 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
     if (block && !block.headerRow) {
       for (const cell of row) {
         if (!cell) continue;
-        if (/panasuna|chits|rosci|good day|member code|phone no|chit details|kindly note|^dear |january|february|march|april|may|june|july|august|september|october|november|december/i.test(cell)) continue;
-        if (cell.length < 3) continue;
-        block.addressLines.push(cell);
+        const normalized = cell.trim();
+        if (!normalized || normalized.length < 3) continue;
+        if (PANASUNA_ADDRESS_SKIP.test(normalized.toLowerCase())) continue;
+        if (/^dear\s+/i.test(normalized)) continue;
+        if (/\b(intimation|member code|phone no|chit details|kindly note|auction time|auction date|period|chit value|previous bid amount|share of discount)\b/i.test(normalized)) continue;
+        block.addressLines.push(normalized);
       }
     }
   }

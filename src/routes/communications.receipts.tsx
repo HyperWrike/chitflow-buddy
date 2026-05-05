@@ -27,7 +27,7 @@ export const Route = createFileRoute("/communications/receipts")({
 });
 
 type SubscriberLite = { id: string; access_code: string; name: string; whatsapp_number: string; address_line1: string | null; address_line2: string | null; city: string; pincode: string | null };
-type ReceiptLine = { subscriptionId: string; groupCode: string; chitValue: number; durationMonths: number; amountDue: number; prized: boolean; seatCount: number };
+type ReceiptLine = { subscriptionId: string; groupCode: string; chitValue: number; durationMonths: number; amountDue: number; prized: boolean; seatCount: number; auctionDay?: number | null };
 
 function ReceiptsPage() {
   const month = currentMonth();
@@ -75,11 +75,9 @@ function ReceiptsPage() {
     queryKey: ["sub-receipt-detail", selectedSub?.id, month],
     enabled: !!selectedSub,
     queryFn: async () => {
-      const allDemoStatements = getDemoStatements(undefined, selectedSub!.id);
-      const preferredMonth = allDemoStatements.some((statement) => statement.month === month)
-        ? month
-        : allDemoStatements.slice().sort((a, b) => b.month.localeCompare(a.month))[0]?.month ?? month;
-      const demoStatements = allDemoStatements.filter((statement) => statement.month === preferredMonth);
+      const importedStatements = getDemoStatements(undefined, selectedSub!.id).filter((statement: any) => statement.source !== "seed");
+      const preferredMonth = importedStatements.slice().sort((a: any, b: any) => (b.imported_at ?? "").localeCompare(a.imported_at ?? ""))[0]?.month;
+      const demoStatements = preferredMonth ? importedStatements.filter((statement) => statement.month === preferredMonth) : [];
 
       if (demoStatements.length) {
         const demoGroups = getDemoGroups();
@@ -97,11 +95,27 @@ function ReceiptsPage() {
               seatCount: subscription?.seat_count ?? 1,
               prized: statement.prized,
               amountDue: statement.chit_amount_due ?? 0,
+              auctionDay: statement.auction_day ?? group.auction_day,
             };
           })
           .filter(Boolean) as ReceiptLine[];
 
-        return { month: preferredMonth, lines };
+        const latest = demoStatements[0] as any;
+        return {
+          month: preferredMonth,
+          lines,
+          imported: true,
+          subscriber: {
+            id: selectedSub!.id,
+            access_code: latest.access_code || selectedSub!.access_code,
+            name: latest.subscriber_name || selectedSub!.name,
+            whatsapp_number: latest.whatsapp_number || selectedSub!.whatsapp_number,
+            address_line1: latest.address_line1 || selectedSub!.address_line1,
+            address_line2: latest.address_line2 || selectedSub!.address_line2,
+            city: latest.city || selectedSub!.city,
+            pincode: latest.pincode || selectedSub!.pincode,
+          } satisfies SubscriberLite,
+        };
       }
 
       const { data: dbSubscriptions } = await db
@@ -180,16 +194,21 @@ function ReceiptsPage() {
           monthlyEntryId: entry?.id ?? null,
         };
         }),
+        imported: false,
       };
     },
   });
 
   const lines = subDetail.data?.lines ?? [];
+  const importedReceipt = subDetail.data?.imported === true;
+  const receiptSubscriber = subDetail.data?.subscriber ?? selectedSub;
   const receiptMonth = subDetail.data?.month ?? month;
   const totalSelected = useMemo(
     () => lines.filter((l) => selectedSubIds.has(l.subscriptionId)).reduce((sum, l) => sum + l.amountDue, 0),
     [lines, selectedSubIds],
   );
+  const previewLines = importedReceipt ? lines : lines.filter((l) => selectedSubIds.has(l.subscriptionId));
+  const totalPreview = importedReceipt ? lines.reduce((sum, line) => sum + line.amountDue, 0) : totalSelected;
 
   const toggle = (id: string) => {
     setSelectedSubIds((prev) => {
@@ -207,10 +226,10 @@ function ReceiptsPage() {
   };
 
   const saveAndSend = async (alsoPrint: boolean) => {
-    if (!selectedSub || selectedSubIds.size === 0) return;
+    if (!selectedSub || (!importedReceipt && selectedSubIds.size === 0)) return;
     setSubmitting(true);
     try {
-      const paid = lines.filter((l) => selectedSubIds.has(l.subscriptionId));
+      const paid = importedReceipt ? lines : lines.filter((l) => selectedSubIds.has(l.subscriptionId));
       // Mark dues paid where we have monthly entries
       for (const line of paid) {
         if (!line.monthlyEntryId) continue;
@@ -235,7 +254,7 @@ function ReceiptsPage() {
         status: "sent",
         sent_at: new Date().toISOString(),
       });
-      toast.success(`Receipt recorded for ${selectedSub.name} — ${formatINR(totalSelected)}`);
+      toast.success(`Receipt recorded for ${selectedSub.name} — ${formatINR(importedReceipt ? totalPreview : totalSelected)}`);
       if (alsoPrint) printElement("receipt-printable", `Receipt — ${selectedSub.name}`);
       qc.invalidateQueries();
       setTimeout(reset, 600);
@@ -372,9 +391,9 @@ function ReceiptsPage() {
         <div>
           <div className="text-sm text-muted-foreground mb-2">Live receipt preview</div>
           <ReceiptPreview
-            subscriber={selectedSub}
-            lines={lines.filter((l) => selectedSubIds.has(l.subscriptionId))}
-            totalSelected={totalSelected}
+            subscriber={receiptSubscriber}
+            lines={previewLines}
+            totalSelected={totalPreview}
             paymentMode={paymentMode}
             paymentDate={paymentDate}
             paymentRef={paymentRef}

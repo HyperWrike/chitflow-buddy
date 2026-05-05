@@ -64,7 +64,9 @@ function RemindersPage() {
   const data = useQuery({
     queryKey: ["reminders-rows", month],
     queryFn: async (): Promise<Row[]> => {
-      const demoStatements = getDemoStatements(month);
+      const importedStatements = getDemoStatements(undefined, undefined).filter((statement: any) => statement.source !== "seed");
+      const byImportMonth = importedStatements.filter((statement) => statement.month === month);
+      const demoStatements = byImportMonth.length ? byImportMonth : [];
       if (demoStatements.length) {
         const demoGroups = getDemoGroups();
         const demoSubscribers = getDemoSubscribers();

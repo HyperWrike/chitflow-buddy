@@ -15,6 +15,8 @@ type DemoDispatch = {
 type DemoStatement = {
   id: string;
   month: string;
+  source: "seed" | "import";
+  imported_at: string | null;
   subscriber_id: string;
   group_id: string;
   group_code: string;
@@ -356,7 +358,7 @@ export const upsertDemoStatement = (statement: Omit<DemoStatement, "id">) => {
   const state = readState();
   const list = state.statements ?? [];
   const existingIndex = list.findIndex((item) => item.month === statement.month && item.subscriber_id === statement.subscriber_id && item.group_id === statement.group_id);
-  const next: DemoStatement = { id: existingIndex >= 0 ? list[existingIndex].id : makeId(), ...statement };
+  const next: DemoStatement = { id: existingIndex >= 0 ? list[existingIndex].id : makeId(), ...statement, source: "import", imported_at: new Date().toISOString() };
   const statements = existingIndex >= 0
     ? list.map((item, index) => (index === existingIndex ? next : item))
     : [...list, next];
@@ -536,6 +538,8 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
       if (row.month) {
         const statement = {
           month: row.month,
+          source: "import",
+          imported_at: new Date().toISOString(),
           subscriber_id: subscriber.id,
           group_id: group.id,
           group_code: group.group_code,
