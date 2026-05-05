@@ -63,6 +63,58 @@ function RemindersPage() {
   const data = useQuery({
     queryKey: ["reminders-rows", month],
     queryFn: async (): Promise<Row[]> => {
+      const mapDemoEntries = () => {
+        const demoGroups = getDemoGroups();
+        const demoEntries = getDemoMonthlyEntries(month);
+        return demoEntries
+          .map((e) => {
+            const g = demoGroups.find((x) => x.id === e.group_id);
+            if (!g) return null;
+            return {
+              id: e.id,
+              group_id: e.group_id,
+              winning_bid: e.winning_bid,
+              locked: e.locked,
+              chit_groups: {
+                id: g.id,
+                group_code: g.group_code,
+                chit_value: g.chit_value,
+                duration_months: g.duration_months,
+                commission_rate: g.commission_rate,
+                auction_day: g.auction_day,
+              },
+            };
+          })
+          .filter(Boolean);
+      };
+
+      const mapDemoSubscriptions = (groupIds: string[]) => {
+        const demoSubscriptions = getDemoSubscriptions().filter((s) => groupIds.includes(s.group_id) && s.active !== false);
+        const demoSubscribers = getDemoSubscribers();
+        return demoSubscriptions
+          .map((s) => {
+            const sub = demoSubscribers.find((x) => x.id === s.subscriber_id);
+            if (!sub) return null;
+            return {
+              id: s.id,
+              subscriber_id: s.subscriber_id,
+              group_id: s.group_id,
+              seat_count: s.seat_count,
+              prized: s.prized,
+              subscribers: {
+                id: sub.id,
+                name: sub.name,
+                access_code: sub.access_code,
+                whatsapp_number: sub.whatsapp_number,
+                address_line1: sub.address_line1,
+                city: sub.city,
+                pincode: sub.pincode,
+              },
+            };
+          })
+          .filter(Boolean);
+      };
+
       const { data: dbEntries } = await db
         .from("monthly_entries")
         .select("id, group_id, winning_bid, locked, chit_groups!inner(id, group_code, chit_value, duration_months, commission_rate, auction_day)")
@@ -73,13 +125,7 @@ function RemindersPage() {
       let dispatches: any[] = [];
 
       if (!entries.length) {
-        const demoGroups = getDemoGroups();
-        const demoEntries = getDemoMonthlyEntries(month);
-        entries = demoEntries.map((e) => {
-          const g = demoGroups.find((x) => x.id === e.group_id);
-          if (!g) return null;
-          return { id: e.id, group_id: e.group_id, winning_bid: e.winning_bid, locked: e.locked, chit_groups: { id: g.id, group_code: g.group_code, chit_value: g.chit_value, duration_months: g.duration_months, commission_rate: g.commission_rate, auction_day: g.auction_day } };
-        }).filter(Boolean);
+        entries = mapDemoEntries();
       }
       if (!entries.length) return [];
 
@@ -92,16 +138,19 @@ function RemindersPage() {
         .eq("active", true);
       subs = dbSubs ?? [];
       if (!subs.length) {
-        const demoSubscriptions = getDemoSubscriptions().filter((s) => groupIds.includes(s.group_id) && s.active !== false);
-        const demoSubscribers = getDemoSubscribers();
-        subs = demoSubscriptions.map((s) => {
-          const sub = demoSubscribers.find((x) => x.id === s.subscriber_id);
-          if (!sub) return null;
-          return {
-            id: s.id, subscriber_id: s.subscriber_id, group_id: s.group_id, seat_count: s.seat_count, prized: s.prized,
-            subscribers: { id: sub.id, name: sub.name, access_code: sub.access_code, whatsapp_number: sub.whatsapp_number, address_line1: sub.address_line1, city: sub.city, pincode: sub.pincode },
-          };
-        }).filter(Boolean);
+        subs = mapDemoSubscriptions(groupIds);
+
+        // In partial-RLS scenarios, db monthly entries may be readable while subscriptions are not.
+        // Switch fully to demo entries when they have usable subscriber data.
+        if (!subs.length) {
+          const demoEntries = mapDemoEntries();
+          const demoGroupIds = demoEntries.map((e: any) => e.group_id);
+          const demoSubs = mapDemoSubscriptions(demoGroupIds);
+          if (demoEntries.length && demoSubs.length) {
+            entries = demoEntries;
+            subs = demoSubs;
+          }
+        }
       }
       if (!subs.length) return [];
 

@@ -290,9 +290,11 @@ export const getDemoMonthlyEntries = (month?: string) => {
   const state = readState();
   let entries = state.monthlyEntries ?? [];
 
-  if (month && !entries.some((e) => e.month === month)) {
+  if (month) {
     const groups = state.groups;
-    const newEntries = groups.map((group) => ({
+    const existingGroupIds = new Set(entries.filter((e) => e.month === month).map((e) => e.group_id));
+    const missingGroups = groups.filter((group) => !existingGroupIds.has(group.id));
+    const newEntries = missingGroups.map((group) => ({
       id: makeId(),
       group_id: group.id,
       month,
@@ -301,8 +303,10 @@ export const getDemoMonthlyEntries = (month?: string) => {
       prized_subscription_id: null,
       locked: false,
     }));
-    entries = [...entries, ...newEntries];
-    writeState({ ...state, monthlyEntries: entries });
+    if (newEntries.length > 0) {
+      entries = [...entries, ...newEntries];
+      writeState({ ...state, monthlyEntries: entries });
+    }
   }
 
   return month ? entries.filter((e) => e.month === month) : entries;
