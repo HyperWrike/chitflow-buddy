@@ -10,7 +10,10 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { currentMonth, formatINR, formatMonth, monthOptions } from "@/lib/format";
 import { computeGroupTotals, computeMemberDue } from "@/lib/calculator";
-import { CheckCircle2, Lock, Calculator } from "lucide-react";
+import { CheckCircle2, Lock, Calculator, Plus } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/data-entry")({
@@ -25,6 +28,8 @@ function DataEntryPage() {
 function DataEntry() {
   const [month, setMonth] = useState(currentMonth());
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedGroupForAdd, setSelectedGroupForAdd] = useState("");
   const months = monthOptions(24);
 
   const groups = useQuery({
@@ -56,9 +61,14 @@ function DataEntry() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Monthly Data Entry</h1>
-        <p className="text-sm text-muted-foreground">Enter winning bid for each group, then confirm to lock.</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Monthly Data Entry</h1>
+          <p className="text-sm text-muted-foreground">Enter winning bid for each group, then confirm to lock.</p>
+        </div>
+        <Button onClick={() => setAddDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Add Entry
+        </Button>
       </div>
 
       <Card className="p-5">
@@ -123,6 +133,45 @@ function DataEntry() {
           onClose={() => setActiveGroupId(null)}
         />
       )}
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Monthly Entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Select Chit Group</Label>
+              <select
+                className="w-full mt-2 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedGroupForAdd}
+                onChange={(e) => setSelectedGroupForAdd(e.target.value)}
+              >
+                <option value="">Select a group...</option>
+                {(groups.data ?? []).map((g) => (
+                  <option key={g.id} value={g.id}>{g.group_code} (Day {g.auction_day})</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              This will open the data entry form for the selected group for the current selected month ({formatMonth(month)}).
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button
+              disabled={!selectedGroupForAdd}
+              onClick={() => {
+                setActiveGroupId(selectedGroupForAdd);
+                setAddDialogOpen(false);
+                setSelectedGroupForAdd("");
+              }}
+            >
+              Proceed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
