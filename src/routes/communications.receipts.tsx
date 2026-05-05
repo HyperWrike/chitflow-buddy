@@ -27,7 +27,23 @@ export const Route = createFileRoute("/communications/receipts")({
 });
 
 type SubscriberLite = { id: string; access_code: string; name: string; whatsapp_number: string; address_line1: string | null; address_line2: string | null; city: string; pincode: string | null };
-type ReceiptLine = { subscriptionId: string; groupCode: string; chitValue: number; durationMonths: number; amountDue: number; prized: boolean; seatCount: number; auctionDay?: number | null };
+type ReceiptLine = {
+  subscriptionId: string;
+  groupCode: string;
+  subscriberName: string;
+  auctionDate: string | null;
+  auctionTime: string | null;
+  agreeNo: string | null;
+  chitValue: number;
+  previousBidAmount: number | null;
+  cc: number | null;
+  shareOfDiscount: number | null;
+  periodMonths: number | null;
+  chitAmountAfterIncentive: number;
+  prized: boolean;
+  seatCount: number;
+  auctionDay?: number | null;
+};
 
 function ReceiptsPage() {
   const month = currentMonth();
@@ -80,25 +96,23 @@ function ReceiptsPage() {
       const demoStatements = preferredMonth ? importedStatements.filter((statement) => statement.month === preferredMonth) : [];
 
       if (demoStatements.length) {
-        const demoGroups = getDemoGroups();
-        const demoSubscriptions = getDemoSubscriptions().filter((subscription) => subscription.subscriber_id === selectedSub!.id && subscription.active !== false);
-        const lines: ReceiptLine[] = demoStatements
-          .map((statement) => {
-            const group = demoGroups.find((item) => item.id === statement.group_id);
-            if (!group) return null;
-            const subscription = demoSubscriptions.find((item) => item.group_id === group.id);
-            return {
-              subscriptionId: subscription?.id ?? statement.group_id,
-              groupCode: statement.group_code || group.group_code,
-              chitValue: statement.chit_value || group.chit_value,
-              durationMonths: statement.period_months || group.duration_months,
-              seatCount: subscription?.seat_count ?? 1,
-              prized: statement.prized,
-              amountDue: statement.chit_amount_due ?? 0,
-              auctionDay: statement.auction_day ?? group.auction_day,
-            };
-          })
-          .filter(Boolean) as ReceiptLine[];
+        const lines: ReceiptLine[] = demoStatements.map((statement: any) => ({
+          subscriptionId: `${statement.group_id}::${statement.agree_no ?? statement.group_code}`,
+          groupCode: statement.group_code,
+          subscriberName: statement.subscriber_name,
+          auctionDate: statement.auction_date,
+          auctionTime: statement.auction_time,
+          agreeNo: statement.agree_no,
+          chitValue: statement.chit_value,
+          previousBidAmount: statement.previous_bid_amount,
+          cc: statement.cc,
+          shareOfDiscount: statement.share_of_discount,
+          periodMonths: statement.period_months,
+          chitAmountAfterIncentive: statement.chit_amount_after_incentive ?? 0,
+          prized: statement.prized,
+          seatCount: 1,
+          auctionDay: statement.auction_day,
+        }));
 
         const latest = demoStatements[0] as any;
         return {
@@ -416,6 +430,88 @@ function ReceiptPreview({
   paymentRef: string;
   month: string;
 }) {
+  const importedTemplate = lines.length > 0 && lines[0].agreeNo != null;
+  const totalAmount = importedTemplate ? lines.reduce((sum, line) => sum + line.chitAmountAfterIncentive, 0) : totalSelected;
+
+  if (importedTemplate && subscriber) {
+    return (
+      <div id="receipt-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
+        <div style={{ background: "#0f2744", color: "white", padding: "20px 28px", borderBottom: "1px solid #07101d" }}>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>Panasuna Chits (P) Ltd</div>
+          <div style={{ fontSize: 12, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+          <div style={{ fontSize: 11, opacity: 0.8 }}>(A ROSCI Institution)</div>
+        </div>
+        <div style={{ background: "#f5a623", color: "#0f2744", padding: "8px 28px", fontWeight: 600, fontSize: 13, display: "flex", justifyContent: "space-between" }}>
+          <span>Phone: {subscriber.whatsapp_number}</span>
+          <span>ACKNOWLEDGEMENT RECEIPT</span>
+          <span>{paymentDate}</span>
+        </div>
+
+        <div style={{ padding: "22px 28px 28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 12 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+              <strong>{subscriber.name}</strong><br />
+              {subscriber.address_line1}{subscriber.address_line2 ? `, ${subscriber.address_line2}` : ""}<br />
+              {subscriber.city} - {subscriber.pincode}
+            </div>
+            <div style={{ textAlign: "right", fontSize: 13, lineHeight: 1.5 }}>
+              <div><strong>Month:</strong> {formatMonth(month)}</div>
+              <div><strong>Code:</strong> {subscriber.access_code}</div>
+            </div>
+          </div>
+
+          <div style={{ background: "#ddeeff", padding: "10px 14px", borderRadius: 6, fontSize: 13, marginBottom: 16 }}>
+            Dear Sir/Madam, we have received your <strong>{paymentMode.replace("_", " ")}</strong> of <strong>{formatINR(totalAmount)}</strong> dated {formatDateDMY(paymentDate)} for {formatMonth(month)}.
+            {paymentRef && <> Ref: <strong>{paymentRef}</strong>.</>}
+          </div>
+
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#0f2744", color: "white" }}>
+                <th style={{ textAlign: "center", padding: "9px 8px" }}>Auction Date</th>
+                <th style={{ textAlign: "center", padding: "9px 8px" }}>Time</th>
+                <th style={{ textAlign: "center", padding: "9px 8px" }}>Agree#</th>
+                <th style={{ textAlign: "left", padding: "9px 8px" }}>Group</th>
+                <th style={{ textAlign: "left", padding: "9px 8px" }}>Subscriber Name</th>
+                <th style={{ textAlign: "center", padding: "9px 8px" }}>Prized</th>
+                <th style={{ textAlign: "right", padding: "9px 8px" }}>Chit Value</th>
+                <th style={{ textAlign: "right", padding: "9px 8px" }}>Previous Bid Amount</th>
+                <th style={{ textAlign: "right", padding: "9px 8px" }}>CC</th>
+                <th style={{ textAlign: "right", padding: "9px 8px" }}>Share of Discount</th>
+                <th style={{ textAlign: "center", padding: "9px 8px" }}>Period</th>
+                <th style={{ textAlign: "right", padding: "9px 8px" }}>Chit Amount (After Incentive)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line, index) => (
+                <tr key={line.subscriptionId} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
+                  <td style={{ padding: "8px", textAlign: "center" }}>{line.auctionDate || line.auctionDay || ""}</td>
+                  <td style={{ padding: "8px", textAlign: "center" }}>{line.auctionTime || ""}</td>
+                  <td style={{ padding: "8px", textAlign: "center" }}>{line.agreeNo || ""}</td>
+                  <td style={{ padding: "8px" }}>{line.groupCode}</td>
+                  <td style={{ padding: "8px" }}>{line.subscriberName}</td>
+                  <td style={{ padding: "8px", textAlign: "center" }}>{line.prized ? "Yes" : "No"}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitValue)}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.previousBidAmount ?? 0)}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.cc ?? 0)}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.shareOfDiscount ?? 0)}</td>
+                  <td style={{ padding: "8px", textAlign: "center" }}>{line.periodMonths ? `${line.periodMonths}` : ""}</td>
+                  <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitAmountAfterIncentive)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr style={{ background: "#e6f0c8", color: "#0f2744", fontWeight: 700 }}>
+                <td style={{ padding: "10px 12px", textAlign: "center" }} colSpan={11}>Total</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="receipt-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
       <div style={{ background: "#0f2744", color: "white", padding: "20px 28px" }}>

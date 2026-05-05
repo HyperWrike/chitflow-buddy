@@ -27,14 +27,18 @@ type DemoStatement = {
   address_line2: string | null;
   city: string;
   pincode: string | null;
+  auction_date: string | null;
+  auction_time: string | null;
+  agree_no: string | null;
   name_on_chit: string;
   prized: boolean;
   chit_value: number;
   previous_bid_amount: number | null;
+  cc: number | null;
   share_of_discount: number | null;
   period_months: number | null;
   auction_day: number | null;
-  chit_amount_due: number | null;
+  chit_amount_after_incentive: number | null;
 };
 
 type DemoState = {
@@ -415,6 +419,9 @@ export type ImportRow = {
   city?: string | null;
   pincode?: string | null;
   groupCode?: string | null;
+  agreeNo?: string | null;
+  auctionDate?: string | null;
+  auctionTime?: string | null;
   chitValue?: number | null;
   durationMonths?: number | null;
   auctionDay?: number | null;
@@ -423,7 +430,10 @@ export type ImportRow = {
   nameOnChit?: string | null;
   prized?: boolean | null;
   previousBidAmount?: number | null;
+  cc?: number | null;
   shareOfDiscount?: number | null;
+  chitAmountAfterIncentive?: number | null;
+  month?: string | null;
 };
 
 export type ImportSummary = {
@@ -550,14 +560,18 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
           address_line2: subscriber.address_line2,
           city: subscriber.city,
           pincode: subscriber.pincode,
+          auction_date: row.auctionDate ?? null,
+          auction_time: row.auctionTime ?? group.auction_time,
+          agree_no: row.agreeNo ?? null,
           name_on_chit: row.nameOnChit?.trim() || subscriber.name,
           prized: row.prized === true,
           chit_value: Number(row.chitValue) || group.chit_value,
           previous_bid_amount: row.previousBidAmount ?? null,
+          cc: row.cc ?? null,
           share_of_discount: row.shareOfDiscount ?? null,
           period_months: Number(row.durationMonths) || group.duration_months,
           auction_day: Number(row.auctionDay) || group.auction_day,
-          chit_amount_due: row.chitAmountDue ?? null,
+          chit_amount_after_incentive: row.chitAmountAfterIncentive ?? null,
         } satisfies Omit<DemoStatement, "id">;
         upsertDemoStatement(statement);
       }

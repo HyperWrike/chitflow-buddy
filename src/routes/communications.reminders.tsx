@@ -35,9 +35,26 @@ type Row = {
   accessCode: string;
   phone: string;
   address1: string | null;
+  address2?: string | null;
   city: string;
   pincode: string | null;
-  groups: { groupCode: string; chitValue: number; auctionDay: number; amountDue: number; prized: boolean; seatCount: number }[];
+  groups: {
+    groupCode: string;
+    subscriberName: string;
+    auctionDate: string | null;
+    auctionTime: string | null;
+    agreeNo: string | null;
+    chitValue: number;
+    previousBidAmount: number | null;
+    cc: number | null;
+    shareOfDiscount: number | null;
+    periodMonths: number | null;
+    chitAmountAfterIncentive: number;
+    auctionDay: number;
+    amountDue: number;
+    prized: boolean;
+    seatCount: number;
+  }[];
   totalDue: number;
   dispatchStatus?: string;
 };
@@ -68,9 +85,7 @@ function RemindersPage() {
       const byImportMonth = importedStatements.filter((statement) => statement.month === month);
       const demoStatements = byImportMonth.length ? byImportMonth : [];
       if (demoStatements.length) {
-        const demoGroups = getDemoGroups();
         const demoSubscribers = getDemoSubscribers();
-        const demoSubscriptions = getDemoSubscriptions();
 
         const { data: dbDispatch } = await db
           .from("dispatch_log")
@@ -82,31 +97,39 @@ function RemindersPage() {
         dispatches.forEach((d: any) => dispatchBySub.set(d.subscriber_id, d.status));
 
         const bySub = new Map<string, Row>();
-        demoStatements.forEach((statement) => {
+        demoStatements.forEach((statement: any) => {
           const subscriber = demoSubscribers.find((item) => item.id === statement.subscriber_id);
-          const group = demoGroups.find((item) => item.id === statement.group_id);
-          if (!subscriber || !group) return;
-          const subscription = demoSubscriptions.find((item) => item.subscriber_id === subscriber.id && item.group_id === group.id);
-          const amountDue = statement.chit_amount_due ?? 0;
+          if (!subscriber) return;
+          const amountDue = statement.chit_amount_after_incentive ?? 0;
           const row: Row = bySub.get(subscriber.id) ?? {
             subscriberId: subscriber.id,
-            name: subscriber.name,
-            accessCode: subscriber.access_code,
-            phone: subscriber.whatsapp_number,
-            address1: subscriber.address_line1,
-            city: subscriber.city,
-            pincode: subscriber.pincode,
+            name: statement.subscriber_name || subscriber.name,
+            accessCode: statement.access_code || subscriber.access_code,
+            phone: statement.whatsapp_number || subscriber.whatsapp_number,
+            address1: statement.address_line1 || subscriber.address_line1,
+            address2: statement.address_line2 || subscriber.address_line2,
+            city: statement.city || subscriber.city,
+            pincode: statement.pincode || subscriber.pincode,
             groups: [],
             totalDue: 0,
             dispatchStatus: dispatchBySub.get(subscriber.id),
           };
           row.groups.push({
-            groupCode: statement.group_code || group.group_code,
-            chitValue: statement.chit_value || group.chit_value,
-            auctionDay: statement.auction_day ?? group.auction_day,
+            groupCode: statement.group_code,
+            subscriberName: statement.subscriber_name,
+            auctionDate: statement.auction_date,
+            auctionTime: statement.auction_time,
+            agreeNo: statement.agree_no,
+            chitValue: statement.chit_value,
+            previousBidAmount: statement.previous_bid_amount,
+            cc: statement.cc,
+            shareOfDiscount: statement.share_of_discount,
+            periodMonths: statement.period_months,
+            chitAmountAfterIncentive: statement.chit_amount_after_incentive ?? 0,
+            auctionDay: statement.auction_day ?? 0,
             amountDue,
             prized: statement.prized,
-            seatCount: subscription?.seat_count ?? 1,
+            seatCount: 1,
           });
           row.totalDue += amountDue;
           bySub.set(subscriber.id, row);
@@ -492,6 +515,84 @@ function RemindersPage() {
 }
 
 function StatementPreview({ row, month }: { row: Row; month: string }) {
+  const importedTemplate = row.groups.length > 0 && row.groups[0].agreeNo != null;
+  const totalAmount = importedTemplate ? row.groups.reduce((sum, group) => sum + group.chitAmountAfterIncentive, 0) : row.totalDue;
+
+  if (importedTemplate) {
+    return (
+      <div id="reminder-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
+        <div style={{ background: "#0f2744", color: "white", padding: "20px 28px", borderBottom: "1px solid #07101d" }}>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>Panasuna Chits (P) Ltd</div>
+          <div style={{ fontSize: 12, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+          <div style={{ fontSize: 11, opacity: 0.8 }}>(A ROSCI Institution)</div>
+        </div>
+        <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "6px 12px", fontWeight: 700, fontSize: 13, display: "grid", gridTemplateColumns: "repeat(12, 1fr)", alignItems: "center", borderBottom: "1px solid #3f5119" }}>
+          <div style={{ gridColumn: "span 2" }}>Phone No:</div>
+          <div style={{ gridColumn: "span 2", textAlign: "center" }}>{row.phone}</div>
+          <div style={{ gridColumn: "span 6", textAlign: "center", color: "#b34e0a" }}>screenshot after payment is</div>
+          <div style={{ gridColumn: "span 2", textAlign: "right" }}>Member Code: {row.accessCode}</div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", borderBottom: "1px solid #0f2744" }}>
+          <div style={{ background: "#f7eecf", padding: "14px 18px", minHeight: 132, borderRight: "1px solid #0f2744", lineHeight: 1.5 }}>
+            <strong>Dear {row.name},</strong><br />
+            {row.address1}<br />
+            {row.address2}<br />
+            {row.city} - {row.pincode}.
+          </div>
+          <div style={{ background: "#f7eecf", display: "grid", gridTemplateRows: "1fr auto", alignItems: "center" }}>
+            <div style={{ padding: "18px 20px", textAlign: "center", fontSize: 28, fontWeight: 700 }}>January - 2025 Chit Details</div>
+            <div style={{ borderTop: "1px solid #0f2744", padding: "10px 20px", textAlign: "center", fontWeight: 700 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
+          </div>
+        </div>
+
+        <div style={{ background: "#f7eecf", padding: "6px 12px", textAlign: "center", fontWeight: 700, borderBottom: "1px solid #0f2744" }}>
+          Kindly note the chit amount and pay before Auction Date.
+        </div>
+
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#0f2744", color: "white" }}>
+              <th style={{ padding: "10px 8px", textAlign: "center" }}>Auction Date</th>
+              <th style={{ padding: "10px 8px", textAlign: "center" }}>Time</th>
+              <th style={{ padding: "10px 8px", textAlign: "center" }}>Agree#</th>
+              <th style={{ padding: "10px 8px", textAlign: "left" }}>Group</th>
+              <th style={{ padding: "10px 8px", textAlign: "left" }}>Subscriber Name</th>
+              <th style={{ padding: "10px 8px", textAlign: "center" }}>Prized<br />(Yes/No)</th>
+              <th style={{ padding: "10px 8px", textAlign: "right" }}>Chit Value</th>
+              <th style={{ padding: "10px 8px", textAlign: "right" }}>Previous<br />Bid Amount</th>
+              <th style={{ padding: "10px 8px", textAlign: "right" }}>CC</th>
+              <th style={{ padding: "10px 8px", textAlign: "right" }}>Share of<br />Discount</th>
+              <th style={{ padding: "10px 8px", textAlign: "center" }}>Period</th>
+              <th style={{ padding: "10px 8px", textAlign: "right" }}>Chit<br />Amount (After Incentive)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {row.groups.map((group, index) => (
+              <tr key={group.groupCode} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
+                <td style={{ padding: "8px", textAlign: "center" }}>{group.auctionDate || group.auctionDay || ""}</td>
+                <td style={{ padding: "8px", textAlign: "center" }}>{group.auctionTime || ""}</td>
+                <td style={{ padding: "8px", textAlign: "center" }}>{group.agreeNo || ""}</td>
+                <td style={{ padding: "8px" }}>{group.groupCode}</td>
+                <td style={{ padding: "8px" }}>{group.subscriberName}</td>
+                <td style={{ padding: "8px", textAlign: "center" }}>{group.prized ? "Yes" : "No"}</td>
+                <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitValue)}</td>
+                <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.previousBidAmount ?? 0)}</td>
+                <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.cc ?? 0)}</td>
+                <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.shareOfDiscount ?? 0)}</td>
+                <td style={{ padding: "8px", textAlign: "center" }}>{group.periodMonths ? `${group.periodMonths}` : ""}</td>
+                <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitAmountAfterIncentive)}</td>
+              </tr>
+            ))}
+            <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
+              <td colSpan={11} style={{ padding: "8px", textAlign: "center" }}>Total</td>
+              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <div id="reminder-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
       <div style={{ background: "#0f2744", color: "white", padding: "20px 28px" }}>
@@ -509,6 +610,7 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
           <div style={{ fontSize: 14, lineHeight: 1.6, color: "#0f2744" }}>
             <strong>{row.name}</strong><br />
             {row.address1}<br />
+            {row.address2}<br />
             {row.city} – {row.pincode}
           </div>
           <div style={{ fontSize: 13, textAlign: "right", color: "#0f2744" }}>

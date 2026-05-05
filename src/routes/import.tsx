@@ -31,6 +31,9 @@ const FIELD_DEFS: { key: keyof ImportRow; label: string; required?: boolean; ali
   { key: "city", label: "City", aliases: ["city", "town"] },
   { key: "pincode", label: "Pincode", aliases: ["pin", "pincode", "zip", "postal", "postal code"] },
   { key: "groupCode", label: "Group Code", aliases: ["group", "group code", "chit code", "chit group", "scheme", "ps", "chit"] },
+  { key: "agreeNo", label: "Agree#", aliases: ["agree#", "agree no", "agreement no", "agreement"] },
+  { key: "auctionDate", label: "Auction Date", aliases: ["auction date"] },
+  { key: "auctionTime", label: "Auction Time", aliases: ["time", "auction time"] },
   { key: "chitValue", label: "Chit Value", aliases: ["chit value", "value", "amount", "chit amount", "chit amount (after incentive)"] },
   { key: "durationMonths", label: "Duration (months)", aliases: ["duration", "months", "duration months", "term", "period"] },
   { key: "auctionDay", label: "Auction Day", aliases: ["auction day", "auction date", "day"] },
@@ -39,7 +42,9 @@ const FIELD_DEFS: { key: keyof ImportRow; label: string; required?: boolean; ali
   { key: "nameOnChit", label: "Name on Chit", aliases: ["name on chit", "chit name"] },
   { key: "prized", label: "Prized (Yes/No)", aliases: ["prized", "prized (yes/no)", "prized yes/no", "is prized"] },
   { key: "previousBidAmount", label: "Previous Bid Amount", aliases: ["previous bid amount", "previous bid", "prev bid", "winning bid"] },
+  { key: "cc", label: "CC", aliases: ["cc"] },
   { key: "shareOfDiscount", label: "Share of Discount", aliases: ["share of discount", "discount share", "share discount"] },
+  { key: "chitAmountAfterIncentive", label: "Chit Amount (After Incentive)", aliases: ["chit amount (after incentive)", "chit amount"] },
 ];
 
 const NUMBER_FIELDS: (keyof ImportRow)[] = ["chitValue", "durationMonths", "auctionDay", "commissionRate", "seats", "previousBidAmount", "shareOfDiscount"];
@@ -273,9 +278,12 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
       if (SUMMARY_LABELS.some((label) => summaryCheck === label || summaryCheck.startsWith(label + " ") || summaryCheck.endsWith(" " + label))) continue;
 
       const auctionStr = get(row, cm, "auction date", "auction day");
+      const timeStr = get(row, cm, "time", "auction time");
+      const agreeStr = get(row, cm, "agree#", "agree no", "agreement no", "agreement");
       const prizedStr = get(row, cm, "prized (yes/no)", "prized yes/no", "prized");
       const chitVal = get(row, cm, "chit value");
       const prevBid = get(row, cm, "previous bid amount");
+      const ccStr = get(row, cm, "cc");
       const shareDisc = get(row, cm, "share of discount");
       const period = get(row, cm, "period");
       const chitAmtAfter = get(row, cm, "chit amount (after incentive)", "chit amount");
@@ -292,6 +300,9 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
         city: "Salem",
         pincode: (block.addressLines.join(" ").match(/(\d{6})/) || [null, null])[1],
         groupCode: groupCode || null,
+        agreeNo: agreeStr || null,
+        auctionDate: auctionStr || null,
+        auctionTime: timeStr || null,
         chitValue: parseNum(chitVal),
         durationMonths,
         auctionDay: parseNum(auctionStr),
@@ -299,8 +310,9 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
         nameOnChit: subscriberOnRow || block.name,
         prized: /^y/i.test(prizedStr),
         previousBidAmount: parseNum(prevBid),
+        cc: parseNum(ccStr),
         shareOfDiscount: parseNum(shareDisc),
-        chitAmountDue: parseNum(chitAmtAfter),
+        chitAmountAfterIncentive: parseNum(chitAmtAfter),
         month: block.month,
       });
       continue;
