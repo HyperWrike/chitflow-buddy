@@ -584,20 +584,60 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
 
 export const clearAllDemoData = () => {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(DEMO_KEY);
-  const fresh = seedState();
-  window.localStorage.setItem(DEMO_KEY, JSON.stringify(fresh));
+  const emptyState: DemoState = {
+    subscribers: [],
+    groups: [],
+    subscriptions: [],
+    monthlyEntries: [],
+    dispatches: [],
+    statements: [],
+  };
+  window.localStorage.setItem(DEMO_KEY, JSON.stringify(emptyState));
   window.dispatchEvent(new CustomEvent(DEMO_EVENT));
 };
 
 export const clearImportedData = () => {
   const state = readState();
+  
+  // Get all imported group IDs
+  const importedGroupIds = new Set(
+    (state.statements ?? [])
+      .filter((s) => s.source === "import")
+      .map((s) => s.group_id)
+  );
+
+  // Remove subscriptions and groups that only exist in imports
+  const remainingSubscriptions = state.subscriptions.filter((sub) => {
+    // Keep subscriptions that reference non-imported groups
+    const group = state.groups.find((g) => g.id === sub.group_id);
+    if (!group) return false; // Group doesn't exist, remove subscription
+    
+    // Check if this group only has imported statements
+    const groupStatements = (state.statements ?? []).filter((s) => s.group_id === group.id);
+    const allImported = groupStatements.every((s) => s.source === "import");
+    
+    // If group has no statements or only imported ones, remove the subscription
+    if (allImported && groupStatements.length > 0) return false;
+    return true;
+  });
+
+  // Keep only groups that have remaining subscriptions
+  const remainingGroupIds = new Set(remainingSubscriptions.map((s) => s.group_id));
+  const remainingGroups = state.groups.filter((g) => remainingGroupIds.has(g.id));
+
+  // Keep only subscribers that have remaining subscriptions
+  const remainingSubIds = new Set(remainingSubscriptions.map((s) => s.subscriber_id));
+  const remainingSubscribers = state.subscribers.filter((s) => remainingSubIds.has(s.id));
+
+  // Remove all imported statements
   const seedStatements = (state.statements ?? []).filter((s) => s.source === "seed");
+
   writeState({
     ...state,
+    subscribers: remainingSubscribers,
+    groups: remainingGroups,
+    subscriptions: remainingSubscriptions,
     statements: seedStatements,
-    // Keep only subscribers and groups that are used by seeded statements
-    subscriptions: state.subscriptions,
   });
 };
 
