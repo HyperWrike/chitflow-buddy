@@ -14,6 +14,7 @@ import {
   getDemoDispatches,
   getDemoGroups,
   getDemoMonthlyEntries,
+  getDemoStatements,
   getDemoSubscribers,
   getDemoSubscriptions,
 } from "@/lib/demo-data";
@@ -63,6 +64,55 @@ function RemindersPage() {
   const data = useQuery({
     queryKey: ["reminders-rows", month],
     queryFn: async (): Promise<Row[]> => {
+      const demoStatements = getDemoStatements(month);
+      if (demoStatements.length) {
+        const demoGroups = getDemoGroups();
+        const demoSubscribers = getDemoSubscribers();
+        const demoSubscriptions = getDemoSubscriptions();
+
+        const { data: dbDispatch } = await db
+          .from("dispatch_log")
+          .select("subscriber_id, status")
+          .eq("month", month)
+          .eq("type", "reminder");
+        const dispatches = dbDispatch ?? getDemoDispatches(month, "reminder").map((d) => ({ subscriber_id: d.subscriber_id, status: d.status }));
+        const dispatchBySub = new Map<string, string>();
+        dispatches.forEach((d: any) => dispatchBySub.set(d.subscriber_id, d.status));
+
+        const bySub = new Map<string, Row>();
+        demoStatements.forEach((statement) => {
+          const subscriber = demoSubscribers.find((item) => item.id === statement.subscriber_id);
+          const group = demoGroups.find((item) => item.id === statement.group_id);
+          if (!subscriber || !group) return;
+          const subscription = demoSubscriptions.find((item) => item.subscriber_id === subscriber.id && item.group_id === group.id);
+          const amountDue = statement.chit_amount_due ?? 0;
+          const row: Row = bySub.get(subscriber.id) ?? {
+            subscriberId: subscriber.id,
+            name: subscriber.name,
+            accessCode: subscriber.access_code,
+            phone: subscriber.whatsapp_number,
+            address1: subscriber.address_line1,
+            city: subscriber.city,
+            pincode: subscriber.pincode,
+            groups: [],
+            totalDue: 0,
+            dispatchStatus: dispatchBySub.get(subscriber.id),
+          };
+          row.groups.push({
+            groupCode: statement.group_code || group.group_code,
+            chitValue: statement.chit_value || group.chit_value,
+            auctionDay: statement.auction_day ?? group.auction_day,
+            amountDue,
+            prized: statement.prized,
+            seatCount: subscription?.seat_count ?? 1,
+          });
+          row.totalDue += amountDue;
+          bySub.set(subscriber.id, row);
+        });
+
+        return Array.from(bySub.values()).sort((a, b) => a.name.localeCompare(b.name));
+      }
+
       const mapDemoEntries = () => {
         const demoGroups = getDemoGroups();
         const demoEntries = getDemoMonthlyEntries(month);

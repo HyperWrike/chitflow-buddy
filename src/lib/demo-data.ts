@@ -12,12 +12,36 @@ type DemoDispatch = {
   sent_at: string | null;
 };
 
+type DemoStatement = {
+  id: string;
+  month: string;
+  subscriber_id: string;
+  group_id: string;
+  group_code: string;
+  access_code: string;
+  subscriber_name: string;
+  whatsapp_number: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string;
+  pincode: string | null;
+  name_on_chit: string;
+  prized: boolean;
+  chit_value: number;
+  previous_bid_amount: number | null;
+  share_of_discount: number | null;
+  period_months: number | null;
+  auction_day: number | null;
+  chit_amount_due: number | null;
+};
+
 type DemoState = {
   subscribers: Subscriber[];
   groups: ChitGroup[];
   subscriptions: Subscription[];
   monthlyEntries?: DemoMonthlyEntry[];
   dispatches?: DemoDispatch[];
+  statements?: DemoStatement[];
 };
 
 const DEMO_KEY = "panasuna_demo_state_v1";
@@ -164,6 +188,10 @@ export const ensureDemoState = () => readState();
 export const getDemoSubscribers = () => readState().subscribers;
 export const getDemoGroups = () => readState().groups;
 export const getDemoSubscriptions = () => readState().subscriptions;
+export const getDemoStatements = (month?: string, subscriberId?: string) => {
+  const list = readState().statements ?? [];
+  return list.filter((statement) => (!month || statement.month === month) && (!subscriberId || statement.subscriber_id === subscriberId));
+};
 
 export const getDemoSubscriberPayload = () =>
   readState().subscribers.map((subscriber) => ({
@@ -293,6 +321,7 @@ export const getDemoMonthlyEntries = (month?: string) => {
   if (month) {
     const groups = state.groups;
     const existingGroupIds = new Set(entries.filter((e) => e.month === month).map((e) => e.group_id));
+    const statementGroupIds = new Set((state.statements ?? []).filter((statement) => statement.month === month).map((statement) => statement.group_id));
     const missingGroups = groups.filter((group) => !existingGroupIds.has(group.id));
     const newEntries = missingGroups.map((group) => ({
       id: makeId(),
@@ -303,13 +332,36 @@ export const getDemoMonthlyEntries = (month?: string) => {
       prized_subscription_id: null,
       locked: false,
     }));
-    if (newEntries.length > 0) {
-      entries = [...entries, ...newEntries];
+    const statementEntries = groups
+      .filter((group) => statementGroupIds.has(group.id) && !existingGroupIds.has(group.id))
+      .map((group) => ({
+        id: makeId(),
+        group_id: group.id,
+        month,
+        winning_bid: Math.round(group.chit_value * 0.78),
+        company_commission: Math.round(group.chit_value * (group.commission_rate / 100)),
+        prized_subscription_id: null,
+        locked: false,
+      }));
+    if (newEntries.length > 0 || statementEntries.length > 0) {
+      entries = [...entries, ...newEntries, ...statementEntries];
       writeState({ ...state, monthlyEntries: entries });
     }
   }
 
   return month ? entries.filter((e) => e.month === month) : entries;
+};
+
+export const upsertDemoStatement = (statement: Omit<DemoStatement, "id">) => {
+  const state = readState();
+  const list = state.statements ?? [];
+  const existingIndex = list.findIndex((item) => item.month === statement.month && item.subscriber_id === statement.subscriber_id && item.group_id === statement.group_id);
+  const next: DemoStatement = { id: existingIndex >= 0 ? list[existingIndex].id : makeId(), ...statement };
+  const statements = existingIndex >= 0
+    ? list.map((item, index) => (index === existingIndex ? next : item))
+    : [...list, next];
+  writeState({ ...state, statements });
+  return next;
 };
 
 export const upsertDemoMonthlyEntry = (entry: Partial<DemoMonthlyEntry> & { group_id: string; month: string; winning_bid: number; company_commission: number }) => {
@@ -479,6 +531,31 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
         });
         existingEnrollments.add(key);
         summary.enrollmentsCreated++;
+      }
+
+      if (row.month) {
+        const statement = {
+          month: row.month,
+          subscriber_id: subscriber.id,
+          group_id: group.id,
+          group_code: group.group_code,
+          access_code: subscriber.access_code,
+          subscriber_name: subscriber.name,
+          whatsapp_number: subscriber.whatsapp_number,
+          address_line1: subscriber.address_line1,
+          address_line2: subscriber.address_line2,
+          city: subscriber.city,
+          pincode: subscriber.pincode,
+          name_on_chit: row.nameOnChit?.trim() || subscriber.name,
+          prized: row.prized === true,
+          chit_value: Number(row.chitValue) || group.chit_value,
+          previous_bid_amount: row.previousBidAmount ?? null,
+          share_of_discount: row.shareOfDiscount ?? null,
+          period_months: Number(row.durationMonths) || group.duration_months,
+          auction_day: Number(row.auctionDay) || group.auction_day,
+          chit_amount_due: row.chitAmountDue ?? null,
+        } satisfies Omit<DemoStatement, "id">;
+        upsertDemoStatement(statement);
       }
     }
   }

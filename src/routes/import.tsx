@@ -79,9 +79,25 @@ type ParsedFile = {
   rows: Record<string, string>[];
   templateRows?: ImportRow[];
   templateMode?: boolean;
+  templateMonth?: string | null;
 };
 
 const PANASUNA_HEADERS = ["auction date", "subscriber name", "chit value"];
+
+const PANASUNA_MONTHS: Record<string, string> = {
+  january: "01",
+  february: "02",
+  march: "03",
+  april: "04",
+  may: "05",
+  june: "06",
+  july: "07",
+  august: "08",
+  september: "09",
+  october: "10",
+  november: "11",
+  december: "12",
+};
 
 function looksLikePanasunaTemplate(grid: string[][]): boolean {
   const flat = grid
@@ -93,6 +109,14 @@ function looksLikePanasunaTemplate(grid: string[][]): boolean {
   return false;
 }
 
+function detectPanasunaMonth(grid: string[][]): string | null {
+  const text = grid.slice(0, 30).map((row) => row.map((c) => String(c).trim()).filter(Boolean).join(" ")).join("\n");
+  const match = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s*[-–]\s*(\d{4})\s+chit details\b/i);
+  if (!match) return null;
+  const month = PANASUNA_MONTHS[match[1].toLowerCase()];
+  return month ? `${match[2]}-${month}` : null;
+}
+
 function parsePanasunaGrid(grid: string[][]): ImportRow[] {
   const out: ImportRow[] = [];
 
@@ -101,6 +125,7 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
     accessCode: string;
     phone: string;
     addressLines: string[];
+    month: string | null;
     headerRow?: number;
     columnMap?: Record<string, number>;
   };
@@ -182,7 +207,7 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
   };
 
   const startNewBlock = () => {
-    block = { name: "", accessCode: "", phone: "", addressLines: [] };
+    block = { name: "", accessCode: "", phone: "", addressLines: [], month: detectPanasunaMonth(grid) };
   };
 
   for (let i = 0; i < grid.length; i++) {
@@ -273,6 +298,8 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
         prized: /^y/i.test(prizedStr),
         previousBidAmount: parseNum(prevBid),
         shareOfDiscount: parseNum(shareDisc),
+        chitAmountDue: parseNum(chitAmtAfter),
+        month: block.month,
       });
       continue;
     }
@@ -342,6 +369,7 @@ function Importer() {
             rows: [],
             templateRows,
             templateMode: true,
+            templateMonth: templateRows.find((r) => r.month)?.month ?? detectPanasunaMonth(grid),
           });
           setMapping({});
           toast.success(`Detected Panasuna template — extracted ${templateRows.length} subscription rows from ${file.name}`);

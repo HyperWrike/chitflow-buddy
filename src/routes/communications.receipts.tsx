@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   getDemoGroups,
   getDemoMonthlyEntries,
+  getDemoStatements,
   getDemoSubscribers,
   getDemoSubscriptions,
 } from "@/lib/demo-data";
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/communications/receipts")({
 });
 
 type SubscriberLite = { id: string; access_code: string; name: string; whatsapp_number: string; address_line1: string | null; address_line2: string | null; city: string; pincode: string | null };
+type ReceiptLine = { subscriptionId: string; groupCode: string; chitValue: number; durationMonths: number; amountDue: number; prized: boolean; seatCount: number };
 
 function ReceiptsPage() {
   const month = currentMonth();
@@ -73,6 +75,35 @@ function ReceiptsPage() {
     queryKey: ["sub-receipt-detail", selectedSub?.id, month],
     enabled: !!selectedSub,
     queryFn: async () => {
+      const allDemoStatements = getDemoStatements(undefined, selectedSub!.id);
+      const preferredMonth = allDemoStatements.some((statement) => statement.month === month)
+        ? month
+        : allDemoStatements.slice().sort((a, b) => b.month.localeCompare(a.month))[0]?.month ?? month;
+      const demoStatements = allDemoStatements.filter((statement) => statement.month === preferredMonth);
+
+      if (demoStatements.length) {
+        const demoGroups = getDemoGroups();
+        const demoSubscriptions = getDemoSubscriptions().filter((subscription) => subscription.subscriber_id === selectedSub!.id && subscription.active !== false);
+        const lines: ReceiptLine[] = demoStatements
+          .map((statement) => {
+            const group = demoGroups.find((item) => item.id === statement.group_id);
+            if (!group) return null;
+            const subscription = demoSubscriptions.find((item) => item.group_id === group.id);
+            return {
+              subscriptionId: subscription?.id ?? statement.group_id,
+              groupCode: statement.group_code || group.group_code,
+              chitValue: statement.chit_value || group.chit_value,
+              durationMonths: statement.period_months || group.duration_months,
+              seatCount: subscription?.seat_count ?? 1,
+              prized: statement.prized,
+              amountDue: statement.chit_amount_due ?? 0,
+            };
+          })
+          .filter(Boolean) as ReceiptLine[];
+
+        return { month: preferredMonth, lines };
+      }
+
       const { data: dbSubscriptions } = await db
         .from("subscriptions")
         .select("id, seat_count, prized, group_id, name_on_chit, chit_groups!inner(id, group_code, chit_value, duration_months, commission_rate, status)")
@@ -113,7 +144,9 @@ function ReceiptsPage() {
         ? dbAllSubs
         : getDemoSubscriptions().filter((s) => groupIds.includes(s.group_id) && s.active !== false).map((s) => ({ group_id: s.group_id, seat_count: s.seat_count }));
 
-      return subscriptions.map((s: any) => {
+      return {
+        month,
+        lines: subscriptions.map((s: any) => {
         const grp = s.chit_groups;
         const entry = entries?.find((e: any) => e.group_id === s.group_id);
         const totalSeats = (allSubs ?? []).filter((x: any) => x.group_id === s.group_id).reduce((sum: number, x: any) => sum + x.seat_count, 0);
@@ -146,11 +179,13 @@ function ReceiptsPage() {
           amountDue,
           monthlyEntryId: entry?.id ?? null,
         };
-      });
+        }),
+      };
     },
   });
 
-  const lines = subDetail.data ?? [];
+  const lines = subDetail.data?.lines ?? [];
+  const receiptMonth = subDetail.data?.month ?? month;
   const totalSelected = useMemo(
     () => lines.filter((l) => selectedSubIds.has(l.subscriptionId)).reduce((sum, l) => sum + l.amountDue, 0),
     [lines, selectedSubIds],
@@ -343,7 +378,7 @@ function ReceiptsPage() {
             paymentMode={paymentMode}
             paymentDate={paymentDate}
             paymentRef={paymentRef}
-            month={month}
+            month={receiptMonth}
           />
         </div>
       </div>
@@ -355,7 +390,7 @@ function ReceiptPreview({
   subscriber, lines, totalSelected, paymentMode, paymentDate, paymentRef, month,
 }: {
   subscriber: SubscriberLite | null;
-  lines: { subscriptionId: string; groupCode: string; chitValue: number; durationMonths: number; amountDue: number; prized: boolean; seatCount: number }[];
+  lines: ReceiptLine[];
   totalSelected: number;
   paymentMode: string;
   paymentDate: string;
