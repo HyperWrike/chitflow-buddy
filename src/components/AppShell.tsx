@@ -18,6 +18,7 @@ import {
   Menu,
   Sparkles,
   Upload,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -48,6 +49,7 @@ const NAV_COMM: NavItem[] = [
 
 const NAV_FOOTER: NavItem[] = [
   { to: "/templates", label: "Templates", icon: Palette },
+  { to: "/upi-settings", label: "UPI Settings", icon: QrCode },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -64,6 +66,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/settings": "Settings",
   "/chitsync": "ChitSync",
   "/import": "Import Data",
+  "/upi-settings": "UPI Settings",
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {

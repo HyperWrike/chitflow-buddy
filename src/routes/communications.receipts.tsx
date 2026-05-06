@@ -54,6 +54,9 @@ function ReceiptsPage() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentRef, setPaymentRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [noChitEnrolled, setNoChitEnrolled] = useState(false);
+  const [nonChitName, setNonChitName] = useState("");
+  const [amountPaidInput, setAmountPaidInput] = useState<string>("");
   const qc = useQueryClient();
 
   useDemoSync([["subs-search"], ["sub-receipt-detail"]]);
@@ -241,7 +244,12 @@ function ReceiptsPage() {
     [lines, selectedSubIds],
   );
   const previewLines = importedReceipt ? lines : lines.filter((l) => selectedSubIds.has(l.subscriptionId));
-  const totalPreview = importedReceipt ? lines.reduce((sum, line) => sum + line.amountDue, 0) : totalSelected;
+  const expectedTotal = importedReceipt ? lines.reduce((sum, line) => sum + (line.chitAmountAfterIncentive || (line as any).amountDue || 0), 0) : totalSelected;
+  const amountPaidNum = (() => {
+    const v = parseFloat(amountPaidInput);
+    return Number.isFinite(v) && v >= 0 ? v : 0;
+  })();
+  const totalPreview = noChitEnrolled ? amountPaidNum : (amountPaidInput.trim() ? amountPaidNum : expectedTotal);
 
   const toggle = (id: string) => {
     setSelectedSubIds((prev) => {
@@ -256,6 +264,9 @@ function ReceiptsPage() {
     setSelectedSubIds(new Set());
     setPaymentRef("");
     setSearch("");
+    setNoChitEnrolled(false);
+    setNonChitName("");
+    setAmountPaidInput("");
   };
 
   const saveAndSend = async (alsoPrint: boolean) => {
@@ -356,6 +367,27 @@ function ReceiptsPage() {
                 <button onClick={reset} className="text-xs text-muted-foreground underline">Change</button>
               </div>
 
+              <label className="flex items-center gap-2 rounded-xl border bg-surface p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={noChitEnrolled}
+                  onChange={(e) => {
+                    setNoChitEnrolled(e.target.checked);
+                    if (e.target.checked) setSelectedSubIds(new Set());
+                  }}
+                />
+                <span className="text-sm font-medium">No Chit Enrolled</span>
+                <span className="text-xs text-muted-foreground">— record a payment without chit group</span>
+              </label>
+
+              {noChitEnrolled ? (
+                <div className="rounded-xl border bg-surface p-4 space-y-3">
+                  <div>
+                    <label className="text-xs">Subscriber Name (free text)</label>
+                    <input className="w-full mt-1 px-2 py-2 rounded border" value={nonChitName} onChange={(e) => setNonChitName(e.target.value)} placeholder={selectedSub.name} />
+                  </div>
+                </div>
+              ) : (
               <div className="rounded-xl border bg-surface p-4">
                 <div className="font-medium mb-3">Active groups · {formatMonth(month)}</div>
                 {subDetail.isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
@@ -379,6 +411,7 @@ function ReceiptsPage() {
                   <span className="font-mono text-lg font-bold">{formatINR(totalSelected)}</span>
                 </div>
               </div>
+              )}
 
               <div className="rounded-xl border bg-surface p-4 grid grid-cols-2 gap-3">
                 <div>
@@ -394,22 +427,45 @@ function ReceiptsPage() {
                   <label className="text-xs">Payment date</label>
                   <input type="date" className="w-full mt-1 px-2 py-2 rounded border" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
                 </div>
-                <div className="col-span-2">
+                <div>
+                  <label className="text-xs">Amount Paid</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    className="w-full mt-1 px-2 py-2 rounded border font-mono"
+                    value={amountPaidInput}
+                    onChange={(e) => setAmountPaidInput(e.target.value)}
+                    placeholder={!noChitEnrolled && expectedTotal ? String(Math.round(expectedTotal)) : "0"}
+                  />
+                </div>
+                <div>
                   <label className="text-xs">Transaction ref (optional)</label>
                   <input className="w-full mt-1 px-2 py-2 rounded border" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} placeholder="UTR / Cheque no / UPI ref" />
                 </div>
+                {!noChitEnrolled && amountPaidInput.trim() && (
+                  <div className="col-span-2 rounded-md bg-muted/30 p-2 text-xs">
+                    {amountPaidNum > expectedTotal ? (
+                      <span className="text-emerald-700">Excess: ₹{formatINR(amountPaidNum - expectedTotal)}</span>
+                    ) : amountPaidNum < expectedTotal ? (
+                      <span className="text-red-700">Deficit: ₹{formatINR(expectedTotal - amountPaidNum)}</span>
+                    ) : (
+                      <span className="text-emerald-700">Exact Payment</span>
+                    )}
+                    <span className="ml-2 text-muted-foreground">(expected ₹{formatINR(expectedTotal)})</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
                 <button
-                  disabled={selectedSubIds.size === 0 || submitting}
+                  disabled={(noChitEnrolled ? amountPaidNum <= 0 : selectedSubIds.size === 0) || submitting}
                   onClick={() => saveAndSend(false)}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" /> Save & Send via WhatsApp
                 </button>
                 <button
-                  disabled={selectedSubIds.size === 0 || submitting}
+                  disabled={(noChitEnrolled ? amountPaidNum <= 0 : selectedSubIds.size === 0) || submitting}
                   onClick={() => saveAndSend(true)}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium disabled:opacity-50"
                 >
@@ -426,11 +482,14 @@ function ReceiptsPage() {
           <ReceiptPreview
             subscriber={receiptSubscriber}
             lines={previewLines}
-            totalSelected={totalPreview}
+            expectedTotal={expectedTotal}
+            amountPaid={amountPaidInput.trim() ? amountPaidNum : (noChitEnrolled ? 0 : expectedTotal)}
             paymentMode={paymentMode}
             paymentDate={paymentDate}
             paymentRef={paymentRef}
             month={receiptMonth}
+            noChitEnrolled={noChitEnrolled}
+            nonChitName={nonChitName}
           />
         </div>
       </div>
@@ -439,21 +498,27 @@ function ReceiptsPage() {
 }
 
 function ReceiptPreview({
-  subscriber, lines, totalSelected, paymentMode, paymentDate, paymentRef, month,
+  subscriber, lines, expectedTotal, amountPaid, paymentMode, paymentDate, paymentRef, month, noChitEnrolled, nonChitName,
 }: {
   subscriber: SubscriberLite | null;
   lines: ReceiptLine[];
-  totalSelected: number;
+  expectedTotal: number;
+  amountPaid: number;
   paymentMode: string;
   paymentDate: string;
   paymentRef: string;
   month: string;
+  noChitEnrolled: boolean;
+  nonChitName: string;
 }) {
-  const totalAmount = lines.reduce((sum, line) => sum + (line.chitAmountAfterIncentive || line.amountDue || 0), 0);
+  const modeLabel = paymentMode.replace("_", " ");
+  const total = noChitEnrolled ? amountPaid : (amountPaid || expectedTotal);
+  const showVariance = !noChitEnrolled && expectedTotal > 0;
+  const variance = amountPaid - expectedTotal;
 
   if (!subscriber) {
     return (
-      <div id="receipt-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
+      <div id="receipt-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 500 }}>
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#9ca3af" }}>
           <CheckCircle2 style={{ margin: "0 auto", height: 48, width: 48, opacity: 0.4 }} />
           <div style={{ marginTop: 12 }}>Search and select a subscriber to preview their receipt</div>
@@ -462,80 +527,88 @@ function ReceiptPreview({
     );
   }
 
+  // Rows: one per line in the 5-col format. For noChitEnrolled, single row with Group="—".
+  const rows = noChitEnrolled
+    ? [{
+        date: paymentDate,
+        group: "—",
+        name: nonChitName.trim() || subscriber.name,
+        mode: modeLabel,
+        amount: amountPaid,
+      }]
+    : lines.map((line) => ({
+        date: paymentDate,
+        group: line.groupCode,
+        name: line.subscriberName || subscriber.name,
+        mode: modeLabel,
+        amount: line.chitAmountAfterIncentive || (line as any).amountDue || 0,
+      }));
+
   return (
     <div id="receipt-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px" }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>Panasuna Chits (P) Ltd</div>
-        <div style={{ fontSize: 10, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001. (A ROSCI Institution)</div>
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
+        <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+        <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
       </div>
       <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
-        <span>Phone: {subscriber.whatsapp_number}</span>
-        <span style={{ color: "#b34e0a" }}>ACKNOWLEDGEMENT RECEIPT</span>
-        <span>Code: {subscriber.access_code}</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #0f2744" }}>
-        <div style={{ background: "#f7eecf", padding: "8px 12px", borderRight: "1px solid #0f2744", lineHeight: 1.4, fontSize: 11 }}>
-          <strong>Dear {subscriber.name},</strong><br />
-          {subscriber.address_line1}{subscriber.address_line2 ? <>, {subscriber.address_line2}</> : null}<br />
-          {subscriber.city} - {subscriber.pincode}.
-        </div>
-        <div style={{ background: "#f7eecf", padding: "8px 12px", textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>
-          <div style={{ fontSize: 10, marginTop: 4 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
-        </div>
+        <span>Phone No: {subscriber.whatsapp_number}</span>
+        <span>{subscriber.access_code}</span>
       </div>
 
-      <div style={{ background: "#ddeeff", padding: "5px 10px", fontSize: 10, borderBottom: "1px solid #0f2744" }}>
-        Received <strong>{paymentMode.replace("_", " ")}</strong> of <strong>{formatINR(totalAmount)}</strong> on {formatDateDMY(paymentDate)} for {formatMonth(month)}
-        {paymentRef && <> · Ref: <strong>{paymentRef}</strong></>}
+      <div style={{ background: "#f7eecf", padding: "10px 14px", borderBottom: "1px solid #0f2744", textAlign: "center", fontSize: 11, lineHeight: 1.5 }}>
+        <strong>Dear {/^(mr|ms|mrs|dr)\.?/i.test(subscriber.name) ? "" : "Mr./Ms. "}{subscriber.name},</strong><br />
+        {subscriber.address_line1 || ""}{subscriber.address_line2 ? `, ${subscriber.address_line2}` : ""}<br />
+        {subscriber.city || "Salem"} - {subscriber.pincode || ""}.
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
         <thead>
           <tr style={{ background: "#0f2744", color: "white" }}>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Auction<br />Date</th>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Time</th>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Agree#</th>
-            <th style={{ padding: "5px 4px", textAlign: "left" }}>Group</th>
-            <th style={{ padding: "5px 4px", textAlign: "left" }}>Subscriber Name</th>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Prized</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Value</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>Prev. Bid</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>CC</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>Share of<br />Discount</th>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Period</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Amt<br />(After Inc.)</th>
+            <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Date</th>
+            <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Group</th>
+            <th style={{ padding: "6px", textAlign: "left", border: "1px solid #0f2744" }}>Subscriber Name</th>
+            <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Mode of Payment</th>
+            <th style={{ padding: "6px", textAlign: "right", border: "1px solid #0f2744" }}>Chit Amount</th>
           </tr>
         </thead>
         <tbody>
-          {lines.map((line, index) => (
-            <tr key={`${line.subscriptionId}-${index}`} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
-              <td style={{ padding: "4px", textAlign: "center" }}>{line.auctionDate || line.auctionDay || ""}</td>
-              <td style={{ padding: "4px", textAlign: "center" }}>{line.auctionTime || "5.00 PM"}</td>
-              <td style={{ padding: "4px", textAlign: "center" }}>{line.agreeNo || ""}</td>
-              <td style={{ padding: "4px" }}>{line.groupCode}</td>
-              <td style={{ padding: "4px" }}>{line.subscriberName || subscriber.name}</td>
-              <td style={{ padding: "4px", textAlign: "center" }}>{line.prized ? "Yes" : "No"}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitValue)}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.previousBidAmount ?? 0)}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.cc ?? 0)}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.shareOfDiscount ?? 0)}</td>
-              <td style={{ padding: "4px", textAlign: "center" }}>{line.periodMonths ? `${line.periodMonths}` : ""}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{formatINR(line.chitAmountAfterIncentive || line.amountDue || 0)}</td>
+          {rows.length === 0 ? (
+            <tr><td colSpan={5} style={{ padding: "16px", textAlign: "center", color: "#6b7280", border: "1px solid #d1d5db" }}>Select a chit group or enable "No Chit Enrolled"</td></tr>
+          ) : (
+            rows.map((r, i) => (
+              <tr key={i}>
+                <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{formatDateDMY(r.date)}</td>
+                <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{r.group}</td>
+                <td style={{ padding: "6px", border: "1px solid #d1d5db" }}>{r.name},</td>
+                <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{r.mode}</td>
+                <td style={{ padding: "6px", textAlign: "right", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace" }}>{formatINR(r.amount)}</td>
+              </tr>
+            ))
+          )}
+          {showVariance && (
+            <tr>
+              <td colSpan={4} style={{ padding: "6px 10px", border: "1px solid #d1d5db", textAlign: "left", fontWeight: 600 }}>Excess or deficit</td>
+              <td style={{ padding: "6px", textAlign: "right", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace", color: variance > 0 ? "#15803d" : variance < 0 ? "#b91c1c" : "#374151" }}>
+                {variance > 0 ? `Excess ${formatINR(variance)}` : variance < 0 ? `Deficit ${formatINR(-variance)}` : "—"}
+              </td>
             </tr>
-          ))}
-          {lines.length === 0 && (
-            <tr><td colSpan={12} style={{ padding: "12px", textAlign: "center", color: "#6b7280" }}>Select groups to include on the receipt</td></tr>
           )}
           <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
-            <td colSpan={11} style={{ padding: "6px", textAlign: "center" }}>Total</td>
-            <td style={{ padding: "6px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+            <td colSpan={4} style={{ padding: "8px", border: "1px solid #3f5119", textAlign: "left" }}>Total</td>
+            <td style={{ padding: "8px", textAlign: "right", border: "1px solid #3f5119", fontFamily: "ui-monospace, monospace" }}>{formatINR(total)}</td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ padding: "4px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
-        Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd
+      {paymentRef && (
+        <div style={{ padding: "4px 10px", fontSize: 10, color: "#374151", borderTop: "1px solid #e5e7eb" }}>
+          Ref: <strong>{paymentRef}</strong>
+        </div>
+      )}
+
+      <div style={{ padding: "6px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa", borderTop: "1px solid #e5e7eb" }}>
+        Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd · {formatMonth(month)}
       </div>
     </div>
   );

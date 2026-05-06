@@ -19,6 +19,7 @@ import {
   getDemoSubscriptions,
 } from "@/lib/demo-data";
 import { useDemoSync } from "@/lib/use-demo-sync";
+import { UpiBlock } from "@/components/UpiBlock";
 
 export const Route = createFileRoute("/communications/reminders")({
   component: () => (
@@ -636,6 +637,8 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
           </tr>
         </tbody>
       </table>
+
+      <UpiBlock amount={totalAmount} subscriberName={row.name} reference={row.accessCode} />
 
       <div style={{ padding: "4px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
         Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd

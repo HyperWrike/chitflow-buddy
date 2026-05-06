@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UpiSettingsRouteImport } from './routes/upi-settings'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as SubscribersRouteImport } from './routes/subscribers'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -26,6 +27,11 @@ import { Route as CommunicationsRemindersRouteImport } from './routes/communicat
 import { Route as CommunicationsReceiptsRouteImport } from './routes/communications.receipts'
 import { Route as CommunicationsOffersRouteImport } from './routes/communications.offers'
 
+const UpiSettingsRoute = UpiSettingsRouteImport.update({
+  id: '/upi-settings',
+  path: '/upi-settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TemplatesRoute = TemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/upi-settings': typeof UpiSettingsRoute
   '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/receipts': typeof CommunicationsReceiptsRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/upi-settings': typeof UpiSettingsRoute
   '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/receipts': typeof CommunicationsReceiptsRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/subscribers': typeof SubscribersRouteWithChildren
   '/templates': typeof TemplatesRoute
+  '/upi-settings': typeof UpiSettingsRoute
   '/communications/offers': typeof CommunicationsOffersRoute
   '/communications/receipts': typeof CommunicationsReceiptsRoute
   '/communications/reminders': typeof CommunicationsRemindersRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/upi-settings'
     | '/communications/offers'
     | '/communications/receipts'
     | '/communications/reminders'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/upi-settings'
     | '/communications/offers'
     | '/communications/receipts'
     | '/communications/reminders'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/subscribers'
     | '/templates'
+    | '/upi-settings'
     | '/communications/offers'
     | '/communications/receipts'
     | '/communications/reminders'
@@ -231,6 +243,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SubscribersRoute: typeof SubscribersRouteWithChildren
   TemplatesRoute: typeof TemplatesRoute
+  UpiSettingsRoute: typeof UpiSettingsRoute
   CommunicationsOffersRoute: typeof CommunicationsOffersRoute
   CommunicationsReceiptsRoute: typeof CommunicationsReceiptsRoute
   CommunicationsRemindersRoute: typeof CommunicationsRemindersRoute
@@ -238,6 +251,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upi-settings': {
+      id: '/upi-settings'
+      path: '/upi-settings'
+      fullPath: '/upi-settings'
+      preLoaderRoute: typeof UpiSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/templates': {
       id: '/templates'
       path: '/templates'
@@ -388,6 +408,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SubscribersRoute: SubscribersRouteWithChildren,
   TemplatesRoute: TemplatesRoute,
+  UpiSettingsRoute: UpiSettingsRoute,
   CommunicationsOffersRoute: CommunicationsOffersRoute,
   CommunicationsReceiptsRoute: CommunicationsReceiptsRoute,
   CommunicationsRemindersRoute: CommunicationsRemindersRoute,

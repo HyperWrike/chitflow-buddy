@@ -10,7 +10,8 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { importDemoRows, type ImportRow, type ImportSummary } from "@/lib/demo-data";
+import { importDemoRows, addImportHistory, getImportHistory, type ImportRow, type ImportSummary, type ImportHistoryEntry } from "@/lib/demo-data";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/import")({
   component: ImportPage,
@@ -347,11 +348,13 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
 
 function Importer() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [mapping, setMapping] = useState<Record<string, keyof ImportRow | "">>({});
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [history, setHistory] = useState<ImportHistoryEntry[]>(() => getImportHistory());
 
   const onFile = async (file: File) => {
     setSummary(null);
@@ -498,6 +501,14 @@ function Importer() {
       const valid = mappedRows.filter((r) => r.subscriberName?.trim());
       const result = importDemoRows(valid);
       setSummary(result);
+      addImportHistory({
+        fileName: parsed?.fileName ?? "(unknown)",
+        importedBy: user?.email ?? "demo",
+        added: result.subscribersCreated,
+        skipped: result.enrollmentsSkipped,
+        appended: result.enrollmentsCreated,
+      });
+      setHistory(getImportHistory());
       qc.invalidateQueries();
       toast.success(`Import complete: ${result.subscribersCreated} new subscribers, ${result.groupsCreated} new groups, ${result.enrollmentsCreated} enrollments`);
     } catch (err) {
@@ -694,6 +705,43 @@ function Importer() {
           </div>
         </Card>
       )}
+
+      <Card className="p-4">
+        <h2 className="text-lg font-semibold">Import History</h2>
+        <p className="text-xs text-muted-foreground">Last 50 imports.</p>
+        {history.length === 0 ? (
+          <div className="mt-3 rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            No imports yet.
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-3">Date & Time</th>
+                  <th className="py-2 pr-3">File</th>
+                  <th className="py-2 pr-3 text-right">Added</th>
+                  <th className="py-2 pr-3 text-right">Skipped</th>
+                  <th className="py-2 pr-3 text-right">Groups Appended</th>
+                  <th className="py-2 pr-3">Imported By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((entry) => (
+                  <tr key={entry.id} className="border-b last:border-b-0">
+                    <td className="py-2 pr-3">{new Date(entry.importedAt).toLocaleString()}</td>
+                    <td className="py-2 pr-3 font-mono text-xs">{entry.fileName}</td>
+                    <td className="py-2 pr-3 text-right">{entry.added}</td>
+                    <td className="py-2 pr-3 text-right">{entry.skipped}</td>
+                    <td className="py-2 pr-3 text-right">{entry.appended}</td>
+                    <td className="py-2 pr-3">{entry.importedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

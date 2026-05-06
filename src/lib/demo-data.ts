@@ -42,6 +42,23 @@ type DemoStatement = {
   seat_index?: number;
 };
 
+export type UpiSettings = {
+  mode: "static" | "dynamic" | "none";
+  upiId: string | null;       // for dynamic
+  payeeName: string | null;   // for dynamic
+  staticImage: string | null; // base64 data URL for static
+};
+
+export type ImportHistoryEntry = {
+  id: string;
+  importedAt: string;
+  fileName: string;
+  importedBy: string;
+  added: number;
+  skipped: number;
+  appended: number;
+};
+
 type DemoState = {
   subscribers: Subscriber[];
   groups: ChitGroup[];
@@ -49,6 +66,9 @@ type DemoState = {
   monthlyEntries?: DemoMonthlyEntry[];
   dispatches?: DemoDispatch[];
   statements?: DemoStatement[];
+  upi?: UpiSettings;
+  importHistory?: ImportHistoryEntry[];
+  customerCodeCounter?: number;
 };
 
 const DEMO_KEY = "panasuna_demo_state_v1";
@@ -415,7 +435,7 @@ export const addDemoDispatches = (rows: Omit<DemoDispatch, "id">[]) => {
 };
 
 export const peekNextAccessCode = (): string => {
-  return nextAccessCode(readState());
+  return peekNextCustomerCode();
 };
 
 export type ImportRow = {
@@ -475,6 +495,17 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
   const subscribersByCode = new Map(state.subscribers.map((s) => [s.access_code.toLowerCase(), s]));
   const subscribersByPhone = new Map(state.subscribers.filter((s) => s.whatsapp_number).map((s) => [s.whatsapp_number, s]));
   const subscribersByName = new Map(state.subscribers.map((s) => [s.name.trim().toLowerCase(), s]));
+  const existingCustomerCodes = new Set<string>();
+  for (const s of state.subscribers) {
+    if (s.access_code && /^[A-Z]-\d{4}$/.test(s.access_code)) existingCustomerCodes.add(s.access_code);
+  }
+  let codeCounter = state.customerCodeCounter ?? 1;
+  const allocateCode = (): string => {
+    const { code, nextCounter } = generateCustomerCode(existingCustomerCodes, codeCounter);
+    codeCounter = nextCounter;
+    existingCustomerCodes.add(code);
+    return code;
+  };
   const groupsByCode = new Map(state.groups.map((g) => [g.group_code.toLowerCase(), g]));
   const enrollmentKey = (sId: string, gId: string) => `${sId}::${gId}`;
   // Each subscription represents one seat; we don't pre-block multi-seat enrollments here.
@@ -491,7 +522,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
     if (!subscriber) {
       subscriber = {
         id: makeId(),
-        access_code: row.accessCode?.trim() || nextAccessCode({ ...state, subscribers: [...state.subscribers] }),
+        access_code: row.accessCode?.trim() || allocateCode(),
         name: row.subscriberName.trim(),
         address_line1: row.addressLine1 ?? null,
         address_line2: row.addressLine2 ?? null,
@@ -613,6 +644,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
     }
   }
 
+  state.customerCodeCounter = codeCounter;
   writeState(state);
   return summary;
 };
@@ -674,6 +706,72 @@ export const clearImportedData = () => {
     subscriptions: remainingSubscriptions,
     statements: seedStatements,
   });
+};
+
+// ---- UPI Settings ----
+
+const DEFAULT_UPI: UpiSettings = { mode: "none", upiId: null, payeeName: null, staticImage: null };
+
+export const getUpiSettings = (): UpiSettings => {
+  return readState().upi ?? DEFAULT_UPI;
+};
+
+export const saveUpiSettings = (next: Partial<UpiSettings>) => {
+  const state = readState();
+  const current = state.upi ?? DEFAULT_UPI;
+  const merged: UpiSettings = { ...current, ...next };
+  // Mutual exclusion: if mode flips, clear the other side's data
+  if (merged.mode === "static") {
+    merged.upiId = null;
+    merged.payeeName = null;
+  } else if (merged.mode === "dynamic") {
+    merged.staticImage = null;
+  } else {
+    merged.staticImage = null;
+    merged.upiId = null;
+    merged.payeeName = null;
+  }
+  writeState({ ...state, upi: merged });
+  return merged;
+};
+
+// ---- Customer Code Generator (A-0001..Z-9999) ----
+
+export const generateCustomerCode = (existingCodes: Set<string>, counter: number): { code: string; nextCounter: number } => {
+  // counter is sequential 1..(26*9999)
+  let next = counter;
+  while (next <= 26 * 9999) {
+    const letterIdx = Math.floor((next - 1) / 9999);
+    const num = ((next - 1) % 9999) + 1;
+    const code = `${String.fromCharCode(65 + letterIdx)}-${String(num).padStart(4, "0")}`;
+    if (!existingCodes.has(code)) return { code, nextCounter: next + 1 };
+    next++;
+  }
+  throw new Error("Customer code space exhausted");
+};
+
+export const peekNextCustomerCode = (): string => {
+  const state = readState();
+  const existing = new Set<string>();
+  for (const sub of state.subscribers) {
+    if (sub.access_code && /^[A-Z]-\d{4}$/.test(sub.access_code)) existing.add(sub.access_code);
+  }
+  const counter = state.customerCodeCounter ?? 1;
+  return generateCustomerCode(existing, counter).code;
+};
+
+// ---- Import History ----
+
+export const getImportHistory = (): ImportHistoryEntry[] => {
+  return readState().importHistory ?? [];
+};
+
+export const addImportHistory = (entry: Omit<ImportHistoryEntry, "id" | "importedAt">) => {
+  const state = readState();
+  const list = state.importHistory ?? [];
+  const next: ImportHistoryEntry = { id: makeId(), importedAt: new Date().toISOString(), ...entry };
+  writeState({ ...state, importHistory: [next, ...list].slice(0, 50) });
+  return next;
 };
 
 export const isRlsError = (error: unknown) => {
