@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { db } from "@/lib/db-types";
 import { Bell, Gift, Receipt, Search, Printer, Send, CheckCircle2 } from "lucide-react";
-import { currentMonth, formatINR, formatDateDMY, formatMonth } from "@/lib/format";
+import { currentMonth, formatINR, formatDateDMY, formatMonth, formatAddress } from "@/lib/format";
 import { computeGroupTotals, computeMemberDue } from "@/lib/calculator";
 import { printElement } from "@/lib/printable";
 import { toast } from "sonner";
@@ -50,7 +50,7 @@ function ReceiptsPage() {
   const [search, setSearch] = useState("");
   const [selectedSub, setSelectedSub] = useState<SubscriberLite | null>(null);
   const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(new Set());
-  const [paymentMode, setPaymentMode] = useState("CASH");
+  const [paymentMode, setPaymentMode] = useState("NEFT");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentRef, setPaymentRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -417,10 +417,15 @@ function ReceiptsPage() {
                 <div>
                   <label className="text-xs">Payment mode</label>
                   <select className="w-full mt-1 px-2 py-2 rounded border" value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                    <option value="CASH">Cash</option>
-                    <option value="BANK_TRANSFER">Bank transfer</option>
-                    <option value="CHEQUE">Cheque</option>
+                    <option value="NEFT">NEFT</option>
+                    <option value="RTGS">RTGS</option>
+                    <option value="IMPS">IMPS</option>
+                    <option value="A/C Tr">A/C Tr</option>
                     <option value="UPI">UPI</option>
+                    <option value="Chq">Chq</option>
+                    <option value="MB">MB</option>
+                    <option value="Cash dep.">Cash dep.</option>
+                    <option value="FD">FD</option>
                   </select>
                 </div>
                 <div>
@@ -557,9 +562,17 @@ function ReceiptPreview({
       </div>
 
       <div style={{ background: "#f7eecf", padding: "10px 14px", borderBottom: "1px solid #0f2744", textAlign: "center", fontSize: 11, lineHeight: 1.5 }}>
-        <strong>Dear {/^(mr|ms|mrs|dr)\.?/i.test(subscriber.name) ? "" : "Mr./Ms. "}{subscriber.name},</strong><br />
-        {subscriber.address_line1 || ""}{subscriber.address_line2 ? `, ${subscriber.address_line2}` : ""}<br />
-        {subscriber.city || "Salem"} - {subscriber.pincode || ""}.
+        <strong>Dear {/^(mr|ms|mrs|dr)\.?/i.test(subscriber.name) ? "" : "Mr./Ms. "}{subscriber.name},</strong>
+        {(() => {
+          const street = formatAddress([subscriber.address_line1, subscriber.address_line2]);
+          const cityLine = formatAddress([subscriber.city, subscriber.pincode ? `- ${subscriber.pincode}` : null]);
+          return (
+            <>
+              {street && <><br />{street}</>}
+              {cityLine && <><br />{cityLine}.</>}
+            </>
+          );
+        })()}
       </div>
 
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
@@ -606,6 +619,10 @@ function ReceiptPreview({
           Ref: <strong>{paymentRef}</strong>
         </div>
       )}
+
+      <div style={{ padding: "10px", textAlign: "center", fontStyle: "italic", fontSize: 11, color: "#0f2744", borderTop: "1px solid #e5e7eb", background: "#fff" }}>
+        Thank you for the payment
+      </div>
 
       <div style={{ padding: "6px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa", borderTop: "1px solid #e5e7eb" }}>
         Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd · {formatMonth(month)}

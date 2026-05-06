@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/db-types";
 import { Bell, Gift, Receipt, Send, Printer, RefreshCw, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { currentMonth, formatINR, formatDateDMY, formatMonth, monthOptions } from "@/lib/format";
+import { currentMonth, formatINR, formatDateDMY, formatMonth, monthOptions, formatAddress } from "@/lib/format";
 import { computeGroupTotals, computeMemberDue } from "@/lib/calculator";
 import { printElement } from "@/lib/printable";
 import { toast } from "sonner";
@@ -572,20 +572,29 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
 
   return (
     <div id="reminder-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px" }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>Panasuna Chits (P) Ltd</div>
-        <div style={{ fontSize: 10, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001. (A ROSCI Institution)</div>
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
+        <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+        <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
       </div>
       <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
         <span>Phone: {row.phone}</span>
-        <span style={{ color: "#b34e0a" }}>screenshot after payment</span>
+        <span style={{ color: "#b34e0a" }}>Send screenshot after the payment is made</span>
         <span>Code: {row.accessCode}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #0f2744" }}>
         <div style={{ background: "#f7eecf", padding: "8px 12px", borderRight: "1px solid #0f2744", lineHeight: 1.4, fontSize: 11 }}>
-          <strong>Dear {row.name},</strong><br />
-          {row.address1}{row.address2 ? <>, {row.address2}</> : null}<br />
-          {row.city} - {row.pincode}.
+          <strong>Dear {row.name},</strong>
+          {(() => {
+            const street = formatAddress([row.address1, row.address2]);
+            const cityLine = formatAddress([row.city, row.pincode ? `- ${row.pincode}` : null]);
+            return (
+              <>
+                {street && <><br />{street}</>}
+                {cityLine && <><br />{cityLine}.</>}
+              </>
+            );
+          })()}
         </div>
         <div style={{ background: "#f7eecf", padding: "8px 12px", textAlign: "center" }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>

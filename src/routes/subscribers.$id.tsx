@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { formatINR } from "@/lib/format";
+import { formatINR, formatAddress } from "@/lib/format";
 import {
   ensureDemoState,
   getDemoSubscriberDetail,
@@ -99,10 +99,11 @@ function Detail() {
         </Card>
         <Card className="p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase text-muted-foreground">Address</h2>
-          <p className="text-sm">
-            {sub.data.address_line1}<br />
-            {sub.data.address_line2 && <>{sub.data.address_line2}<br /></>}
-            {sub.data.city} {sub.data.pincode && `- ${sub.data.pincode}`}
+          <p className="text-sm whitespace-pre-line">
+            {[
+              formatAddress([sub.data.address_line1, sub.data.address_line2]),
+              formatAddress([sub.data.city, sub.data.pincode ? `- ${sub.data.pincode}` : null]),
+            ].filter(Boolean).join("\n")}
           </p>
         </Card>
       </div>

@@ -132,8 +132,50 @@ function OffersPage() {
               <input className="w-full mt-1 px-3 py-2 rounded border" placeholder="June bonus offer" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs font-medium">Image URL <span className="text-muted-foreground">(optional)</span></label>
-              <input className="w-full mt-1 px-3 py-2 rounded border" placeholder="https://…/banner.jpg" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+              <label className="text-xs font-medium">Image <span className="text-muted-foreground">(optional · jpg/png/webp · max 5MB)</span></label>
+              <div className="mt-1 flex items-center gap-3">
+                <input
+                  id="offer-image-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                      toast.error("Only JPG, PNG, or WEBP allowed");
+                      return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast.error("Image must be under 5MB");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => setImageUrl(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <label
+                  htmlFor="offer-image-upload"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1.5 text-sm hover:bg-muted"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  {imageUrl ? "Replace image" : "Upload image"}
+                </label>
+                {imageUrl && (
+                  <>
+                    <img src={imageUrl} alt="" className="h-12 w-12 rounded border object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl("")}
+                      className="text-xs text-red-600 underline"
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             <div>
               <div className="flex justify-between items-center">

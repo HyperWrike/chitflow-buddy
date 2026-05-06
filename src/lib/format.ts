@@ -1,5 +1,23 @@
 // Indian number formatting + chit-fund helpers
 
+// Joins address parts, deduping case-insensitively, dropping empty values, and
+// never inserting fallback text. Used by receipt/reminder/profile templates.
+export function formatAddress(parts: Array<string | null | undefined>): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of parts) {
+    if (!raw) continue;
+    const trimmed = String(raw).trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out.join(", ");
+}
+
+
 export function formatINR(value: number | string | null | undefined, withSymbol = true): string {
   if (value === null || value === undefined || value === "") return withSymbol ? "₹0" : "0";
   const n = typeof value === "string" ? Number(value) : value;

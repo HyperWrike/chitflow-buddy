@@ -48,21 +48,36 @@ export function UpiBlock({ amount, subscriberName, reference }: Props) {
 
   if (upi.mode === "none") return null;
 
+  const wrapper: React.CSSProperties = {
+    textAlign: "center",
+    padding: "10px 0",
+    borderTop: "1px solid #0f2744",
+    marginTop: 4,
+    background: "#fff",
+  };
+  const heading: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: "#0f2744",
+    marginBottom: 6,
+  };
+
   if (upi.mode === "static" && upi.staticImage) {
     return (
-      <div style={{ textAlign: "center", padding: "8px 0", borderTop: "1px solid #e5e7eb", marginTop: 8 }}>
+      <div style={wrapper}>
+        <div style={heading}>For UPI, use the scanner below</div>
         <img src={upi.staticImage} alt="Scan to pay" style={{ width: 140, height: 140, objectFit: "contain", display: "inline-block" }} />
-        <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>Scan to pay — please enter the amount manually</div>
       </div>
     );
   }
 
   if (upi.mode === "dynamic" && qrDataUrl) {
     return (
-      <div style={{ textAlign: "center", padding: "8px 0", borderTop: "1px solid #e5e7eb", marginTop: 8 }}>
+      <div style={wrapper}>
+        <div style={heading}>For UPI, use the scanner below</div>
         <img src={qrDataUrl} alt="UPI QR" style={{ width: 140, height: 140, display: "inline-block" }} />
         <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>
-          Scan to pay ₹{Math.max(0, Math.round(amount)).toLocaleString("en-IN")} via UPI — amount is pre-filled
+          Amount pre-filled: ₹{Math.max(0, Math.round(amount)).toLocaleString("en-IN")}
         </div>
       </div>
     );
