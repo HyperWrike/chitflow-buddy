@@ -39,6 +39,7 @@ type DemoStatement = {
   period_months: number | null;
   auction_day: number | null;
   chit_amount_after_incentive: number | null;
+  seat_index?: number;
 };
 
 type DemoState = {
@@ -361,16 +362,14 @@ export const getDemoMonthlyEntries = (month?: string) => {
 export const upsertDemoStatement = (statement: Omit<DemoStatement, "id">) => {
   const state = readState();
   const list = state.statements ?? [];
-  // Match on agree_no + prized + previous_bid in addition to (month, subscriber, group)
-  // so a subscriber holding multiple seats in the same group keeps separate rows.
+  // Use seat_index for upsert key so multi-seat rows for the same
+  // (month, subscriber, group) remain as separate statements.
+  const seatIdx = statement.seat_index ?? 1;
   const existingIndex = list.findIndex((item) =>
     item.month === statement.month &&
     item.subscriber_id === statement.subscriber_id &&
     item.group_id === statement.group_id &&
-    (item.agree_no ?? "") === (statement.agree_no ?? "") &&
-    item.prized === statement.prized &&
-    (item.previous_bid_amount ?? null) === (statement.previous_bid_amount ?? null) &&
-    (item.chit_amount_after_incentive ?? null) === (statement.chit_amount_after_incentive ?? null),
+    (item.seat_index ?? 1) === seatIdx,
   );
   const next: DemoStatement = { id: existingIndex >= 0 ? list[existingIndex].id : makeId(), ...statement, source: "import", imported_at: new Date().toISOString() };
   const statements = existingIndex >= 0
@@ -444,6 +443,7 @@ export type ImportRow = {
   shareOfDiscount?: number | null;
   chitAmountAfterIncentive?: number | null;
   month?: string | null;
+  seatIndex?: number | null;
 };
 
 export type ImportSummary = {
@@ -538,10 +538,10 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
         summary.groupsCreated++;
       }
 
-      // A subscriber may legitimately appear multiple times in the same group
-      // (multi-seat). Treat each row's distinct (agree#, prized) as a separate
-      // enrollment so the statement table can render one row per seat.
-      const key = `${enrollmentKey(subscriber.id, group.id)}::${row.agreeNo ?? ""}::${row.prized ? 1 : 0}`;
+      // Each XLSX row = one seat. The parser attaches a seatIndex so the same
+      // (subscriber, group) appearing twice yields two distinct enrollments.
+      const seatIdx = row.seatIndex ?? 1;
+      const key = `${enrollmentKey(subscriber.id, group.id)}::seat${seatIdx}`;
       if (existingEnrollments.has(key)) {
         summary.enrollmentsSkipped++;
       } else {
@@ -550,7 +550,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
           subscriber_id: subscriber.id,
           group_id: group.id,
           name_on_chit: row.nameOnChit?.trim() || subscriber.name,
-          seat_count: Number(row.seats) || 1,
+          seat_count: 1,
           prized: row.prized === true,
           prized_month: null,
           active: true,
@@ -562,7 +562,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
       if (row.month) {
         const statement = {
           month: row.month,
-          source: "import",
+          source: "import" as const,
           imported_at: new Date().toISOString(),
           subscriber_id: subscriber.id,
           group_id: group.id,
@@ -586,6 +586,7 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
           period_months: Number(row.durationMonths) || group.duration_months,
           auction_day: Number(row.auctionDay) || group.auction_day,
           chit_amount_after_incentive: row.chitAmountAfterIncentive ?? null,
+          seat_index: row.seatIndex ?? 1,
         } satisfies Omit<DemoStatement, "id">;
         upsertDemoStatement(statement);
       }

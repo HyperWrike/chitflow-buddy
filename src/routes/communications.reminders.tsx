@@ -116,7 +116,9 @@ function RemindersPage() {
           };
           row.groups.push({
             groupCode: statement.group_code,
-            subscriberName: statement.subscriber_name,
+            // Show the row's own subscriber name from XLSX (auction winner /
+            // multi-seat label), not the recipient's name.
+            subscriberName: statement.name_on_chit || statement.subscriber_name,
             auctionDate: statement.auction_date,
             auctionTime: statement.auction_time,
             agreeNo: statement.agree_no,

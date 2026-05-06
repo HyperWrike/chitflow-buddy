@@ -332,23 +332,16 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
     }
   }
 
-  // Multiple rows with same (subscriber + group) are intentional — they represent
-  // separate seats. Only de-dupe rows that are byte-for-byte identical (same agree#,
-  // chit value, previous bid, etc.) to filter accidental duplicates.
-  const seen = new Set<string>();
-  return out.filter((r) => {
-    const key = [
-      (r.accessCode || r.subscriberName || "").toLowerCase(),
-      (r.groupCode || "").toLowerCase(),
-      r.agreeNo || "",
-      r.chitValue ?? "",
-      r.previousBidAmount ?? "",
-      r.chitAmountAfterIncentive ?? "",
-      r.prized ? "1" : "0",
-    ].join("::");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  // No de-duplication. Each row in the XLSX represents one seat — duplicate
+  // (subscriber, group) rows are intentional and indicate multiple seats.
+  // Tag every row with its seat index within the same (subscriber, group)
+  // so downstream storage can keep them separate.
+  const seatCounter = new Map<string, number>();
+  return out.map((r) => {
+    const key = `${(r.accessCode || r.subscriberName || "").toLowerCase()}::${(r.groupCode || "").toLowerCase()}`;
+    const seatIdx = (seatCounter.get(key) ?? 0) + 1;
+    seatCounter.set(key, seatIdx);
+    return { ...r, seatIndex: seatIdx };
   });
 }
 

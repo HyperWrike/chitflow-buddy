@@ -96,10 +96,10 @@ function ReceiptsPage() {
       const demoStatements = preferredMonth ? importedStatements.filter((statement) => statement.month === preferredMonth) : [];
 
       if (demoStatements.length) {
-        const lines: ReceiptLine[] = demoStatements.map((statement: any) => ({
-          subscriptionId: `${statement.group_id}::${statement.agree_no ?? statement.group_code}`,
+        const lines: ReceiptLine[] = demoStatements.map((statement: any, idx: number) => ({
+          subscriptionId: `${statement.group_id}::${statement.agree_no ?? statement.group_code}::${statement.seat_index ?? idx}`,
           groupCode: statement.group_code,
-          subscriberName: statement.subscriber_name,
+          subscriberName: statement.name_on_chit || statement.subscriber_name,
           auctionDate: statement.auction_date,
           auctionTime: statement.auction_time,
           agreeNo: statement.agree_no,
