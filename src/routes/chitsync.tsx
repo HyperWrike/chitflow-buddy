@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useEffect, useMemo, useState } from "react";
 import chitSyncHtml from "../../chitsync.html?raw";
-import { ensureDemoState, getDemoSubscribers, subscribeDemoChanges } from "@/lib/demo-data";
+import { ensureDemoState, getDemoStatements, getDemoSubscribers, subscribeDemoChanges } from "@/lib/demo-data";
 
 export const Route = createFileRoute("/chitsync")({
   component: ChitSyncPage,
@@ -19,7 +19,16 @@ function ChitSyncPage() {
 
   const srcDoc = useMemo(() => {
     const subs = getDemoSubscribers();
-    const customers = subs.map((s) => ({
+    const importedSubscriberIds = new Set(
+      getDemoStatements(undefined, undefined)
+        .filter((statement) => statement.source === "import")
+        .map((statement) => statement.subscriber_id),
+    );
+    const preferredSubs = importedSubscriberIds.size
+      ? subs.filter((subscriber) => importedSubscriberIds.has(subscriber.id))
+      : subs;
+    const bridgeSubs = preferredSubs.length ? preferredSubs : subs;
+    const customers = bridgeSubs.map((s) => ({
       id: s.id,
       name: s.name,
       phone: (s.whatsapp_number || "").replace(/\D/g, "").slice(-10),

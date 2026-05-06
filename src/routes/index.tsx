@@ -3,6 +3,13 @@ import { ProtectedLayout } from "@/components/ProtectedLayout";
 import { useQuery } from "@tanstack/react-query";
 import { db } from "@/lib/db-types";
 import {
+  ensureDemoState,
+  getDemoDispatches,
+  getDemoGroups,
+  getDemoMonthlyEntries,
+  getDemoSubscribers,
+} from "@/lib/demo-data";
+import {
   Users, Layers3, Send, AlertTriangle,
   ClipboardList, Bell, Receipt as ReceiptIcon,
   ArrowUpRight, CheckCircle2, Clock, XCircle, ChevronRight,
@@ -23,6 +30,48 @@ function Dashboard() {
   const today = new Date().getDate();
   const monthLabel = formatMonth(month);
 
+  const buildDemoDashboard = () => {
+    const subscribers = getDemoSubscribers();
+    const groups = getDemoGroups();
+    const monthEntries = getDemoMonthlyEntries(month);
+    const monthDispatches = getDemoDispatches(month);
+    const activeSubscribers = subscribers.filter((subscriber) => subscriber.active);
+    const activeGroups = groups.filter((group) => group.status === "active");
+    const activeGroupIds = new Set(monthEntries.map((entry) => entry.group_id));
+    const pendingEntry = activeGroups.filter((group) => !activeGroupIds.has(group.id));
+    const upcomingAuctions = activeGroups
+      .filter((group) => group.auction_day >= today && group.auction_day <= today + 7)
+      .sort((a, b) => a.auction_day - b.auction_day);
+    const subscribersById = new Map(subscribers.map((subscriber) => [subscriber.id, subscriber]));
+    const toDispatchRow = (dispatch: any) => ({
+      ...dispatch,
+      subscribers: (() => {
+        const subscriber = subscribersById.get(dispatch.subscriber_id);
+        return subscriber ? { name: subscriber.name, access_code: subscriber.access_code } : null;
+      })(),
+    });
+
+    return {
+      subscribers: activeSubscribers.length,
+      groups: activeGroups.length,
+      sentThisMonth: monthDispatches.filter((dispatch) => ["sent", "delivered", "read"].includes(dispatch.status)).length,
+      totalDispatch: monthDispatches.length,
+      todayGroups: activeGroups.filter((group) => group.auction_day === today),
+      pendingEntry,
+      upcomingAuctions,
+      recentDispatch: monthDispatches
+        .slice()
+        .sort((a, b) => (b.sent_at ?? "").localeCompare(a.sent_at ?? ""))
+        .slice(0, 10)
+        .map(toDispatchRow),
+      failed: monthDispatches
+        .filter((dispatch) => dispatch.status === "failed")
+        .sort((a, b) => (b.sent_at ?? "").localeCompare(a.sent_at ?? ""))
+        .slice(0, 5)
+        .map(toDispatchRow),
+    };
+  };
+
   const stats = useQuery({
     queryKey: ["dashboard-v2", month, today],
     queryFn: async () => {
@@ -38,6 +87,11 @@ function Dashboard() {
           db.from("dispatch_log").select("id, subscriber_id, status, sent_at, whatsapp_number, type, subscribers!inner(name, access_code)").eq("month", month).order("created_at", { ascending: false }).limit(10),
           db.from("dispatch_log").select("id, subscriber_id, status, last_error, whatsapp_number, subscribers!inner(name, access_code)").eq("status", "failed").order("created_at", { ascending: false }).limit(5),
         ]);
+
+      const dbLooksEmpty = (subs.count ?? 0) === 0 && (groups.count ?? 0) === 0;
+      if (dbLooksEmpty) {
+        return buildDemoDashboard();
+      }
 
       const enteredIds = new Set((monthEntries.data ?? []).map((e: any) => e.group_id));
       const pendingEntry = (allActiveGroups.data ?? []).filter((g: any) => !enteredIds.has(g.id));
