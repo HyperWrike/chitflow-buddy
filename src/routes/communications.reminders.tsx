@@ -201,6 +201,7 @@ function RemindersPage() {
               group_id: s.group_id,
               seat_count: s.seat_count,
               prized: s.prized,
+              name_on_chit: s.name_on_chit,
               subscribers: {
                 id: sub.id,
                 name: sub.name,
@@ -233,7 +234,7 @@ function RemindersPage() {
 
       const { data: dbSubs } = await db
         .from("subscriptions")
-        .select("id, subscriber_id, group_id, seat_count, prized, subscribers!inner(id, name, access_code, whatsapp_number, address_line1, city, pincode)")
+        .select("id, subscriber_id, group_id, seat_count, prized, name_on_chit, subscribers!inner(id, name, access_code, whatsapp_number, address_line1, city, pincode)")
         .in("group_id", groupIds)
         .eq("active", true);
       subs = dbSubs ?? [];
@@ -307,7 +308,9 @@ function RemindersPage() {
         for (let seatIdx = 0; seatIdx < seats; seatIdx++) {
           row.groups.push({
             groupCode: grp.group_code,
-            subscriberName: subscriber.name,
+            // Prefer the row's name_on_chit (auction winner / per-seat name)
+            // captured at import time, falling back to the recipient's name.
+            subscriberName: s.name_on_chit || subscriber.name,
             auctionDate: String(grp.auction_day),
             auctionTime: "5.00 PM",
             agreeNo: `${seatIdx + 1}/${grp.duration_months}`,

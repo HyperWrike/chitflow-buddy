@@ -205,7 +205,11 @@ function ReceiptsPage() {
           subscriptionId: `${s.id}::seat${seatIdx + 1}`,
           groupId: grp.id,
           groupCode: grp.group_code,
-          subscriberName: selectedSub?.name ?? "",
+          // Prefer the subscription's name_on_chit (captured per XLSX row) so
+          // when Sundara has PS238 won by "Ranga Traders", that row shows
+          // "Ranga Traders" in the receipt. Fall back to recipient name only
+          // if name_on_chit is missing.
+          subscriberName: s.name_on_chit || selectedSub?.name || "",
           auctionDate: String(grp.auction_day ?? ""),
           auctionTime: "5.00 PM",
           agreeNo: `${seatIdx + 1}/${grp.duration_months}`,

@@ -536,6 +536,13 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
         state.groups.push(group);
         groupsByCode.set(group.group_code.toLowerCase(), group);
         summary.groupsCreated++;
+      } else {
+        // Refresh group properties from the latest import so re-imports propagate
+        // chit_value / duration / auction_day / commission updates.
+        if (Number(row.chitValue)) group.chit_value = Number(row.chitValue);
+        if (Number(row.durationMonths)) group.duration_months = Number(row.durationMonths);
+        if (Number(row.auctionDay)) group.auction_day = Number(row.auctionDay);
+        if (Number(row.commissionRate)) group.commission_rate = Number(row.commissionRate);
       }
 
       // Each XLSX row = one seat. The parser attaches a seatIndex so the same
