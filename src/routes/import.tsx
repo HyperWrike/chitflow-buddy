@@ -332,10 +332,20 @@ function parsePanasunaGrid(grid: string[][]): ImportRow[] {
     }
   }
 
-  // De-dupe identical rows (same person + same group)
+  // Multiple rows with same (subscriber + group) are intentional — they represent
+  // separate seats. Only de-dupe rows that are byte-for-byte identical (same agree#,
+  // chit value, previous bid, etc.) to filter accidental duplicates.
   const seen = new Set<string>();
   return out.filter((r) => {
-    const key = `${(r.accessCode || r.subscriberName || "").toLowerCase()}::${(r.groupCode || "").toLowerCase()}`;
+    const key = [
+      (r.accessCode || r.subscriberName || "").toLowerCase(),
+      (r.groupCode || "").toLowerCase(),
+      r.agreeNo || "",
+      r.chitValue ?? "",
+      r.previousBidAmount ?? "",
+      r.chitAmountAfterIncentive ?? "",
+      r.prized ? "1" : "0",
+    ].join("::");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

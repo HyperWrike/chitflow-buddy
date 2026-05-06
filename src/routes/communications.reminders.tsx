@@ -275,24 +275,30 @@ function RemindersPage() {
           totalDue: 0,
           dispatchStatus: dispatchBySub.get(subscriber.id),
         };
-        row.groups.push({
-          groupCode: grp.group_code,
-          subscriberName: subscriber.name,
-          auctionDate: String(grp.auction_day),
-          auctionTime: "5.00 PM",
-          agreeNo: `${s.seat_count}/${grp.duration_months}`,
-          chitValue: grp.chit_value,
-          previousBidAmount: entry.winning_bid ?? 0,
-          cc: Math.round((grp.chit_value * (grp.commission_rate ?? 0)) / 100 / Math.max(grp.duration_months, 1)),
-          shareOfDiscount: Math.round(totals.per_seat_discount * s.seat_count),
-          periodMonths: grp.duration_months,
-          chitAmountAfterIncentive: due.chit_amount_due,
-          auctionDay: grp.auction_day,
-          amountDue: due.chit_amount_due,
-          prized: s.prized,
-          seatCount: s.seat_count,
-        });
-        row.totalDue += due.chit_amount_due;
+        // Per-seat values (so multi-seat subscriptions render one row per seat)
+        const perSeatDue = s.seat_count > 0 ? due.chit_amount_due / s.seat_count : due.chit_amount_due;
+        const perSeatChitValue = s.seat_count > 0 ? grp.chit_value / s.seat_count : grp.chit_value;
+        const seats = Math.max(1, Number(s.seat_count) || 1);
+        for (let seatIdx = 0; seatIdx < seats; seatIdx++) {
+          row.groups.push({
+            groupCode: grp.group_code,
+            subscriberName: subscriber.name,
+            auctionDate: String(grp.auction_day),
+            auctionTime: "5.00 PM",
+            agreeNo: `${seatIdx + 1}/${grp.duration_months}`,
+            chitValue: perSeatChitValue,
+            previousBidAmount: entry.winning_bid ?? 0,
+            cc: Math.round((perSeatChitValue * (grp.commission_rate ?? 0)) / 100 / Math.max(grp.duration_months, 1)),
+            shareOfDiscount: Math.round(totals.per_seat_discount),
+            periodMonths: grp.duration_months,
+            chitAmountAfterIncentive: perSeatDue,
+            auctionDay: grp.auction_day,
+            amountDue: perSeatDue,
+            prized: s.prized,
+            seatCount: 1,
+          });
+          row.totalDue += perSeatDue;
+        }
         bySub.set(subscriber.id, row);
       });
 
@@ -528,77 +534,74 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
   const totalAmount = row.groups.reduce((sum, group) => sum + (group.chitAmountAfterIncentive || group.amountDue || 0), 0);
 
   return (
-    <div id="reminder-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "20px 28px", borderBottom: "1px solid #07101d" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>Panasuna Chits (P) Ltd</div>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
-        <div style={{ fontSize: 11, opacity: 0.8 }}>(A ROSCI Institution)</div>
+    <div id="reminder-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px" }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>Panasuna Chits (P) Ltd</div>
+        <div style={{ fontSize: 10, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001. (A ROSCI Institution)</div>
       </div>
-      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "6px 12px", fontWeight: 700, fontSize: 13, display: "grid", gridTemplateColumns: "repeat(12, 1fr)", alignItems: "center", borderBottom: "1px solid #3f5119" }}>
-        <div style={{ gridColumn: "span 2" }}>Phone No:</div>
-        <div style={{ gridColumn: "span 3", textAlign: "left" }}>{row.phone}</div>
-        <div style={{ gridColumn: "span 5", textAlign: "center", color: "#b34e0a" }}>screenshot after payment</div>
-        <div style={{ gridColumn: "span 2", textAlign: "right" }}>Member Code: {row.accessCode}</div>
+      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
+        <span>Phone: {row.phone}</span>
+        <span style={{ color: "#b34e0a" }}>screenshot after payment</span>
+        <span>Code: {row.accessCode}</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", borderBottom: "1px solid #0f2744" }}>
-        <div style={{ background: "#f7eecf", padding: "14px 18px", minHeight: 132, borderRight: "1px solid #0f2744", lineHeight: 1.5 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #0f2744" }}>
+        <div style={{ background: "#f7eecf", padding: "8px 12px", borderRight: "1px solid #0f2744", lineHeight: 1.4, fontSize: 11 }}>
           <strong>Dear {row.name},</strong><br />
-          {row.address1}<br />
-          {row.address2}<br />
+          {row.address1}{row.address2 ? <>, {row.address2}</> : null}<br />
           {row.city} - {row.pincode}.
         </div>
-        <div style={{ background: "#f7eecf", display: "grid", gridTemplateRows: "1fr auto", alignItems: "center" }}>
-          <div style={{ padding: "18px 20px", textAlign: "center", fontSize: 28, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>
-          <div style={{ borderTop: "1px solid #0f2744", padding: "10px 20px", textAlign: "center", fontWeight: 700 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
+        <div style={{ background: "#f7eecf", padding: "8px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>
+          <div style={{ fontSize: 10, marginTop: 4 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
         </div>
       </div>
 
-      <div style={{ background: "#f7eecf", padding: "6px 12px", textAlign: "center", fontWeight: 700, borderBottom: "1px solid #0f2744" }}>
+      <div style={{ background: "#f7eecf", padding: "3px 10px", textAlign: "center", fontWeight: 700, fontSize: 10, borderBottom: "1px solid #0f2744" }}>
         Kindly note the chit amount and pay before Auction Date.
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
         <thead>
           <tr style={{ background: "#0f2744", color: "white" }}>
-            <th style={{ padding: "10px 8px", textAlign: "center" }}>Auction Date</th>
-            <th style={{ padding: "10px 8px", textAlign: "center" }}>Time</th>
-            <th style={{ padding: "10px 8px", textAlign: "center" }}>Agree#</th>
-            <th style={{ padding: "10px 8px", textAlign: "left" }}>Group</th>
-            <th style={{ padding: "10px 8px", textAlign: "left" }}>Subscriber Name</th>
-            <th style={{ padding: "10px 8px", textAlign: "center" }}>Prized<br />(Yes/No)</th>
-            <th style={{ padding: "10px 8px", textAlign: "right" }}>Chit Value</th>
-            <th style={{ padding: "10px 8px", textAlign: "right" }}>Previous<br />Bid Amount</th>
-            <th style={{ padding: "10px 8px", textAlign: "right" }}>CC</th>
-            <th style={{ padding: "10px 8px", textAlign: "right" }}>Share of<br />Discount</th>
-            <th style={{ padding: "10px 8px", textAlign: "center" }}>Period</th>
-            <th style={{ padding: "10px 8px", textAlign: "right" }}>Chit<br />Amount (After Incentive)</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Auction<br />Date</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Time</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Agree#</th>
+            <th style={{ padding: "5px 4px", textAlign: "left" }}>Group</th>
+            <th style={{ padding: "5px 4px", textAlign: "left" }}>Subscriber Name</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Prized</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Value</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Prev. Bid</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>CC</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Share of<br />Discount</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Period</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Amt<br />(After Inc.)</th>
           </tr>
         </thead>
         <tbody>
           {row.groups.map((group, index) => (
             <tr key={`${group.groupCode}-${index}`} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
-              <td style={{ padding: "8px", textAlign: "center" }}>{group.auctionDate || group.auctionDay || ""}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{group.auctionTime || "5.00 PM"}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{group.agreeNo || ""}</td>
-              <td style={{ padding: "8px" }}>{group.groupCode}</td>
-              <td style={{ padding: "8px" }}>{group.subscriberName || row.name}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{group.prized ? "Yes" : "No"}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitValue)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.previousBidAmount ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.cc ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.shareOfDiscount ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{group.periodMonths ? `${group.periodMonths}` : ""}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitAmountAfterIncentive || group.amountDue || 0)}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{group.auctionDate || group.auctionDay || ""}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{group.auctionTime || "5.00 PM"}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{group.agreeNo || ""}</td>
+              <td style={{ padding: "4px" }}>{group.groupCode}</td>
+              <td style={{ padding: "4px" }}>{group.subscriberName || row.name}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{group.prized ? "Yes" : "No"}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitValue)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.previousBidAmount ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.cc ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.shareOfDiscount ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{group.periodMonths ? `${group.periodMonths}` : ""}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{formatINR(group.chitAmountAfterIncentive || group.amountDue || 0)}</td>
             </tr>
           ))}
           <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
-            <td colSpan={11} style={{ padding: "8px", textAlign: "center" }}>Total</td>
-            <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+            <td colSpan={11} style={{ padding: "6px", textAlign: "center" }}>Total</td>
+            <td style={{ padding: "6px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ padding: "10px 16px", fontSize: 11, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
+      <div style={{ padding: "4px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
         Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd
       </div>
     </div>

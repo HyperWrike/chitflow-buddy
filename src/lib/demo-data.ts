@@ -361,7 +361,17 @@ export const getDemoMonthlyEntries = (month?: string) => {
 export const upsertDemoStatement = (statement: Omit<DemoStatement, "id">) => {
   const state = readState();
   const list = state.statements ?? [];
-  const existingIndex = list.findIndex((item) => item.month === statement.month && item.subscriber_id === statement.subscriber_id && item.group_id === statement.group_id);
+  // Match on agree_no + prized + previous_bid in addition to (month, subscriber, group)
+  // so a subscriber holding multiple seats in the same group keeps separate rows.
+  const existingIndex = list.findIndex((item) =>
+    item.month === statement.month &&
+    item.subscriber_id === statement.subscriber_id &&
+    item.group_id === statement.group_id &&
+    (item.agree_no ?? "") === (statement.agree_no ?? "") &&
+    item.prized === statement.prized &&
+    (item.previous_bid_amount ?? null) === (statement.previous_bid_amount ?? null) &&
+    (item.chit_amount_after_incentive ?? null) === (statement.chit_amount_after_incentive ?? null),
+  );
   const next: DemoStatement = { id: existingIndex >= 0 ? list[existingIndex].id : makeId(), ...statement, source: "import", imported_at: new Date().toISOString() };
   const statements = existingIndex >= 0
     ? list.map((item, index) => (index === existingIndex ? next : item))
@@ -467,7 +477,8 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
   const subscribersByName = new Map(state.subscribers.map((s) => [s.name.trim().toLowerCase(), s]));
   const groupsByCode = new Map(state.groups.map((g) => [g.group_code.toLowerCase(), g]));
   const enrollmentKey = (sId: string, gId: string) => `${sId}::${gId}`;
-  const existingEnrollments = new Set(state.subscriptions.map((s) => enrollmentKey(s.subscriber_id, s.group_id)));
+  // Each subscription represents one seat; we don't pre-block multi-seat enrollments here.
+  const existingEnrollments = new Set<string>();
 
   for (const row of rows) {
     if (!row.subscriberName?.trim()) continue;
@@ -527,7 +538,10 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
         summary.groupsCreated++;
       }
 
-      const key = enrollmentKey(subscriber.id, group.id);
+      // A subscriber may legitimately appear multiple times in the same group
+      // (multi-seat). Treat each row's distinct (agree#, prized) as a separate
+      // enrollment so the statement table can render one row per seat.
+      const key = `${enrollmentKey(subscriber.id, group.id)}::${row.agreeNo ?? ""}::${row.prized ? 1 : 0}`;
       if (existingEnrollments.has(key)) {
         summary.enrollmentsSkipped++;
       } else {

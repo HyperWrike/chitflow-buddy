@@ -174,7 +174,7 @@ function ReceiptsPage() {
 
       return {
         month,
-        lines: subscriptions.map((s: any) => {
+        lines: subscriptions.flatMap((s: any) => {
         const grp = s.chit_groups;
         const entry = entries?.find((e: any) => e.group_id === s.group_id);
         const totalSeats = (allSubs ?? []).filter((x: any) => x.group_id === s.group_id).reduce((sum: number, x: any) => sum + x.seat_count, 0);
@@ -198,27 +198,30 @@ function ReceiptsPage() {
           amountDue = due.chit_amount_due;
           perSeatDiscount = totals.per_seat_discount;
         }
-        return {
-          subscriptionId: s.id,
+        const seats = Math.max(1, Number(s.seat_count) || 1);
+        const perSeatDue = amountDue / seats;
+        const perSeatChitValue = grp.chit_value / seats;
+        return Array.from({ length: seats }, (_, seatIdx) => ({
+          subscriptionId: `${s.id}::seat${seatIdx + 1}`,
           groupId: grp.id,
           groupCode: grp.group_code,
           subscriberName: selectedSub?.name ?? "",
           auctionDate: String(grp.auction_day ?? ""),
           auctionTime: "5.00 PM",
-          agreeNo: `${s.seat_count}/${grp.duration_months}`,
-          chitValue: grp.chit_value,
+          agreeNo: `${seatIdx + 1}/${grp.duration_months}`,
+          chitValue: perSeatChitValue,
           previousBidAmount: entry?.winning_bid ?? 0,
-          cc: Math.round((grp.chit_value * (grp.commission_rate ?? 0)) / 100 / Math.max(grp.duration_months, 1)),
-          shareOfDiscount: Math.round(perSeatDiscount * s.seat_count),
+          cc: Math.round((perSeatChitValue * (grp.commission_rate ?? 0)) / 100 / Math.max(grp.duration_months, 1)),
+          shareOfDiscount: Math.round(perSeatDiscount),
           periodMonths: grp.duration_months,
-          chitAmountAfterIncentive: amountDue,
+          chitAmountAfterIncentive: perSeatDue,
           durationMonths: grp.duration_months,
-          seatCount: s.seat_count,
+          seatCount: 1,
           prized: s.prized,
-          amountDue,
+          amountDue: perSeatDue,
           auctionDay: grp.auction_day ?? null,
           monthlyEntryId: entry?.id ?? null,
-        };
+        }));
         }),
         imported: false,
       };
@@ -456,81 +459,78 @@ function ReceiptPreview({
   }
 
   return (
-    <div id="receipt-printable" className="printable bg-white border rounded-xl overflow-hidden shadow-sm" style={{ minHeight: 700 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "20px 28px", borderBottom: "1px solid #07101d" }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: 0.5 }}>Panasuna Chits (P) Ltd</div>
-        <div style={{ fontSize: 12, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
-        <div style={{ fontSize: 11, opacity: 0.8 }}>(A ROSCI Institution)</div>
+    <div id="receipt-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px" }}>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>Panasuna Chits (P) Ltd</div>
+        <div style={{ fontSize: 10, opacity: 0.85 }}>419/151-A, Chinnakadai Street, Salem - 636 001. (A ROSCI Institution)</div>
       </div>
-      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "6px 12px", fontWeight: 700, fontSize: 13, display: "grid", gridTemplateColumns: "repeat(12, 1fr)", alignItems: "center", borderBottom: "1px solid #3f5119" }}>
-        <div style={{ gridColumn: "span 2" }}>Phone No:</div>
-        <div style={{ gridColumn: "span 3", textAlign: "left" }}>{subscriber.whatsapp_number}</div>
-        <div style={{ gridColumn: "span 5", textAlign: "center", color: "#b34e0a" }}>ACKNOWLEDGEMENT RECEIPT</div>
-        <div style={{ gridColumn: "span 2", textAlign: "right" }}>Member Code: {subscriber.access_code}</div>
+      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
+        <span>Phone: {subscriber.whatsapp_number}</span>
+        <span style={{ color: "#b34e0a" }}>ACKNOWLEDGEMENT RECEIPT</span>
+        <span>Code: {subscriber.access_code}</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", borderBottom: "1px solid #0f2744" }}>
-        <div style={{ background: "#f7eecf", padding: "14px 18px", minHeight: 132, borderRight: "1px solid #0f2744", lineHeight: 1.5 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #0f2744" }}>
+        <div style={{ background: "#f7eecf", padding: "8px 12px", borderRight: "1px solid #0f2744", lineHeight: 1.4, fontSize: 11 }}>
           <strong>Dear {subscriber.name},</strong><br />
-          {subscriber.address_line1}<br />
-          {subscriber.address_line2 || ""}<br />
+          {subscriber.address_line1}{subscriber.address_line2 ? <>, {subscriber.address_line2}</> : null}<br />
           {subscriber.city} - {subscriber.pincode}.
         </div>
-        <div style={{ background: "#f7eecf", display: "grid", gridTemplateRows: "1fr auto", alignItems: "center" }}>
-          <div style={{ padding: "18px 20px", textAlign: "center", fontSize: 28, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>
-          <div style={{ borderTop: "1px solid #0f2744", padding: "10px 20px", textAlign: "center", fontWeight: 700 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
+        <div style={{ background: "#f7eecf", padding: "8px 12px", textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{formatMonth(month)} Chit Details</div>
+          <div style={{ fontSize: 10, marginTop: 4 }}>(Auction Time : 5.00 PM @ Office/Mob:9842360611)</div>
         </div>
       </div>
 
-      <div style={{ background: "#ddeeff", padding: "10px 14px", fontSize: 13, borderBottom: "1px solid #0f2744" }}>
-        Dear Sir/Madam, we have received your <strong>{paymentMode.replace("_", " ")}</strong> of <strong>{formatINR(totalAmount)}</strong> dated {formatDateDMY(paymentDate)} for {formatMonth(month)}.
-        {paymentRef && <> Ref: <strong>{paymentRef}</strong>.</>}
+      <div style={{ background: "#ddeeff", padding: "5px 10px", fontSize: 10, borderBottom: "1px solid #0f2744" }}>
+        Received <strong>{paymentMode.replace("_", " ")}</strong> of <strong>{formatINR(totalAmount)}</strong> on {formatDateDMY(paymentDate)} for {formatMonth(month)}
+        {paymentRef && <> · Ref: <strong>{paymentRef}</strong></>}
       </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
         <thead>
           <tr style={{ background: "#0f2744", color: "white" }}>
-            <th style={{ textAlign: "center", padding: "9px 8px" }}>Auction Date</th>
-            <th style={{ textAlign: "center", padding: "9px 8px" }}>Time</th>
-            <th style={{ textAlign: "center", padding: "9px 8px" }}>Agree#</th>
-            <th style={{ textAlign: "left", padding: "9px 8px" }}>Group</th>
-            <th style={{ textAlign: "left", padding: "9px 8px" }}>Subscriber Name</th>
-            <th style={{ textAlign: "center", padding: "9px 8px" }}>Prized<br />(Yes/No)</th>
-            <th style={{ textAlign: "right", padding: "9px 8px" }}>Chit Value</th>
-            <th style={{ textAlign: "right", padding: "9px 8px" }}>Previous<br />Bid Amount</th>
-            <th style={{ textAlign: "right", padding: "9px 8px" }}>CC</th>
-            <th style={{ textAlign: "right", padding: "9px 8px" }}>Share of<br />Discount</th>
-            <th style={{ textAlign: "center", padding: "9px 8px" }}>Period</th>
-            <th style={{ textAlign: "right", padding: "9px 8px" }}>Chit<br />Amount (After Incentive)</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Auction<br />Date</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Time</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Agree#</th>
+            <th style={{ padding: "5px 4px", textAlign: "left" }}>Group</th>
+            <th style={{ padding: "5px 4px", textAlign: "left" }}>Subscriber Name</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Prized</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Value</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Prev. Bid</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>CC</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Share of<br />Discount</th>
+            <th style={{ padding: "5px 4px", textAlign: "center" }}>Period</th>
+            <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Amt<br />(After Inc.)</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((line, index) => (
             <tr key={`${line.subscriptionId}-${index}`} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
-              <td style={{ padding: "8px", textAlign: "center" }}>{line.auctionDate || line.auctionDay || ""}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{line.auctionTime || "5.00 PM"}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{line.agreeNo || ""}</td>
-              <td style={{ padding: "8px" }}>{line.groupCode}</td>
-              <td style={{ padding: "8px" }}>{line.subscriberName || subscriber.name}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{line.prized ? "Yes" : "No"}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitValue)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.previousBidAmount ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.cc ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.shareOfDiscount ?? 0)}</td>
-              <td style={{ padding: "8px", textAlign: "center" }}>{line.periodMonths ? `${line.periodMonths}` : ""}</td>
-              <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitAmountAfterIncentive || line.amountDue || 0)}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{line.auctionDate || line.auctionDay || ""}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{line.auctionTime || "5.00 PM"}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{line.agreeNo || ""}</td>
+              <td style={{ padding: "4px" }}>{line.groupCode}</td>
+              <td style={{ padding: "4px" }}>{line.subscriberName || subscriber.name}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{line.prized ? "Yes" : "No"}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.chitValue)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.previousBidAmount ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.cc ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(line.shareOfDiscount ?? 0)}</td>
+              <td style={{ padding: "4px", textAlign: "center" }}>{line.periodMonths ? `${line.periodMonths}` : ""}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{formatINR(line.chitAmountAfterIncentive || line.amountDue || 0)}</td>
             </tr>
           ))}
           {lines.length === 0 && (
-            <tr><td colSpan={12} style={{ padding: "20px", textAlign: "center", color: "#6b7280" }}>Select groups to include on the receipt</td></tr>
+            <tr><td colSpan={12} style={{ padding: "12px", textAlign: "center", color: "#6b7280" }}>Select groups to include on the receipt</td></tr>
           )}
           <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
-            <td colSpan={11} style={{ padding: "8px", textAlign: "center" }}>Total</td>
-            <td style={{ padding: "8px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+            <td colSpan={11} style={{ padding: "6px", textAlign: "center" }}>Total</td>
+            <td style={{ padding: "6px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ padding: "10px 16px", fontSize: 11, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
+      <div style={{ padding: "4px 10px", fontSize: 9, color: "#6b7280", textAlign: "center", background: "#fafafa" }}>
         Generated on {formatDateDMY(new Date())} · Panasuna Chits (P) Ltd
       </div>
     </div>
