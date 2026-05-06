@@ -63,7 +63,19 @@ const PAGE_SIZE = 50;
 
 function RemindersPage() {
   const qc = useQueryClient();
-  const [month, setMonth] = useState(currentMonth());
+  // Default to the most-recent imported month if any exists, else current month.
+  const initialMonth = (() => {
+    if (typeof window === "undefined") return currentMonth();
+    try {
+      const imported = getDemoStatements(undefined, undefined).filter((s: any) => s.source === "import");
+      if (imported.length) {
+        const latest = imported.slice().sort((a: any, b: any) => (b.imported_at ?? "").localeCompare(a.imported_at ?? ""))[0];
+        return latest?.month ?? currentMonth();
+      }
+    } catch {}
+    return currentMonth();
+  })();
+  const [month, setMonth] = useState(initialMonth);
   const [previewIdx, setPreviewIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
@@ -73,7 +85,18 @@ function RemindersPage() {
 
   useEffect(() => {
     ensureDemoState();
+    // After ensure, re-check for imported months and snap to the latest if user
+    // hasn't moved the dropdown manually yet (initialMonth path may have been
+    // before storage was hydrated).
+    const imported = getDemoStatements(undefined, undefined).filter((s: any) => s.source === "import");
+    if (imported.length) {
+      const latest = imported.slice().sort((a: any, b: any) => (b.imported_at ?? "").localeCompare(a.imported_at ?? ""))[0];
+      if (latest?.month && latest.month !== month) {
+        setMonth(latest.month);
+      }
+    }
     qc.invalidateQueries({ queryKey: ["reminders-rows"] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qc]);
 
   useDemoSync([["reminders-rows", month]]);
@@ -403,9 +426,17 @@ function RemindersPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <select className="px-3 py-2 rounded border bg-surface text-sm" value={month} onChange={(e) => { setMonth(e.target.value); setPreviewIdx(0); }}>
-          {monthOptions(12).map((m) => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
+          {(() => {
+            const opts = monthOptions(12);
+            const importedMonths = Array.from(new Set(getDemoStatements(undefined, undefined).filter((s: any) => s.source === "import").map((s: any) => s.month)));
+            const merged = [...opts.map((o) => o.value)];
+            for (const m of importedMonths) if (!merged.includes(m)) merged.push(m);
+            if (!merged.includes(month)) merged.push(month);
+            merged.sort().reverse();
+            return merged.map((value) => (
+              <option key={value} value={value}>{formatMonth(value)}</option>
+            ));
+          })()}
         </select>
         <button onClick={() => qc.invalidateQueries({ queryKey: ["reminders-rows"] })} className="inline-flex items-center gap-1.5 px-3 py-2 rounded border text-sm hover:bg-accent">
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
