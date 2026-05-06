@@ -567,7 +567,8 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
       }
 
       if (row.month) {
-        const statement = {
+        const statement: DemoStatement = {
+          id: makeId(),
           month: row.month,
           source: "import" as const,
           imported_at: new Date().toISOString(),
@@ -594,8 +595,20 @@ export const importDemoRows = (rows: ImportRow[]): ImportSummary => {
           auction_day: Number(row.auctionDay) || group.auction_day,
           chit_amount_after_incentive: row.chitAmountAfterIncentive ?? null,
           seat_index: row.seatIndex ?? 1,
-        } satisfies Omit<DemoStatement, "id">;
-        upsertDemoStatement(statement);
+        };
+        // Mutate the local state directly instead of calling upsertDemoStatement
+        // (which would readState/writeState independently and get clobbered by
+        // the final writeState(state) below).
+        state.statements = state.statements ?? [];
+        const seatIdx = statement.seat_index ?? 1;
+        const idx = state.statements.findIndex((item) =>
+          item.month === statement.month &&
+          item.subscriber_id === statement.subscriber_id &&
+          item.group_id === statement.group_id &&
+          (item.seat_index ?? 1) === seatIdx,
+        );
+        if (idx >= 0) state.statements[idx] = { ...statement, id: state.statements[idx].id };
+        else state.statements.push(statement);
       }
     }
   }
