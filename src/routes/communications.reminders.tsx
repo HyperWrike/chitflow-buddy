@@ -130,10 +130,10 @@ function RemindersPage() {
             name: statement.subscriber_name || subscriber.name,
             accessCode: statement.access_code || subscriber.access_code,
             phone: statement.whatsapp_number || subscriber.whatsapp_number,
-            address1: statement.address_line1 || subscriber.address_line1,
-            address2: statement.address_line2 || subscriber.address_line2,
-            city: statement.city || subscriber.city,
-            pincode: statement.pincode || subscriber.pincode,
+            address1: subscriber.address_line1,
+            address2: subscriber.address_line2,
+            city: subscriber.city,
+            pincode: subscriber.pincode,
             groups: [],
             totalDue: 0,
             dispatchStatus: dispatchBySub.get(subscriber.id),
@@ -209,6 +209,7 @@ function RemindersPage() {
                 access_code: sub.access_code,
                 whatsapp_number: sub.whatsapp_number,
                 address_line1: sub.address_line1,
+                address_line2: sub.address_line2,
                 city: sub.city,
                 pincode: sub.pincode,
               },
@@ -295,7 +296,7 @@ function RemindersPage() {
           accessCode: subscriber.access_code,
           phone: subscriber.whatsapp_number,
           address1: subscriber.address_line1,
-          address2: (subscriber as any).address_line2 ?? null,
+          address2: subscriber.address_line2 ?? null,
           city: subscriber.city,
           pincode: subscriber.pincode,
           groups: [],
@@ -572,10 +573,15 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
 
   return (
     <div id="reminder-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
-        <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
-        <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c8e3a4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ color: "#0f2744", fontWeight: 900, fontSize: 15, fontFamily: "Georgia, serif", letterSpacing: -1 }}>PC</span>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
+          <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+          <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
+        </div>
       </div>
       <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
         <span>Phone: {row.phone}</span>
@@ -610,14 +616,12 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
         <thead>
           <tr style={{ background: "#0f2744", color: "white" }}>
             <th style={{ padding: "5px 4px", textAlign: "center" }}>Auction<br />Date</th>
-            <th style={{ padding: "5px 4px", textAlign: "center" }}>Time</th>
             <th style={{ padding: "5px 4px", textAlign: "center" }}>Agree#</th>
             <th style={{ padding: "5px 4px", textAlign: "left" }}>Group</th>
             <th style={{ padding: "5px 4px", textAlign: "left" }}>Subscriber Name</th>
             <th style={{ padding: "5px 4px", textAlign: "center" }}>Prized</th>
             <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Value</th>
             <th style={{ padding: "5px 4px", textAlign: "right" }}>Prev. Bid</th>
-            <th style={{ padding: "5px 4px", textAlign: "right" }}>CC</th>
             <th style={{ padding: "5px 4px", textAlign: "right" }}>Share of<br />Discount</th>
             <th style={{ padding: "5px 4px", textAlign: "center" }}>Period</th>
             <th style={{ padding: "5px 4px", textAlign: "right" }}>Chit Amt<br />(After Inc.)</th>
@@ -627,22 +631,20 @@ function StatementPreview({ row, month }: { row: Row; month: string }) {
           {row.groups.map((group, index) => (
             <tr key={`${group.groupCode}-${index}`} style={{ background: index % 2 === 0 ? "white" : "#f5f8ff" }}>
               <td style={{ padding: "4px", textAlign: "center" }}>{group.auctionDate || group.auctionDay || ""}</td>
-              <td style={{ padding: "4px", textAlign: "center" }}>{group.auctionTime || "5.00 PM"}</td>
               <td style={{ padding: "4px", textAlign: "center" }}>{group.agreeNo || ""}</td>
               <td style={{ padding: "4px" }}>{group.groupCode}</td>
               <td style={{ padding: "4px" }}>{group.subscriberName || row.name}</td>
               <td style={{ padding: "4px", textAlign: "center" }}>{group.prized ? "Yes" : "No"}</td>
               <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.chitValue)}</td>
               <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.previousBidAmount ?? 0)}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.cc ?? 0)}</td>
               <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(group.shareOfDiscount ?? 0)}</td>
               <td style={{ padding: "4px", textAlign: "center" }}>{group.periodMonths ? `${group.periodMonths}` : ""}</td>
-              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{formatINR(group.chitAmountAfterIncentive || group.amountDue || 0)}</td>
+              <td style={{ padding: "4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontWeight: 600, fontSize: 12 }}>{formatINR(group.chitAmountAfterIncentive || group.amountDue || 0)}</td>
             </tr>
           ))}
-          <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
-            <td colSpan={11} style={{ padding: "6px", textAlign: "center" }}>Total</td>
-            <td style={{ padding: "6px", textAlign: "right", fontFamily: "ui-monospace, monospace" }}>{formatINR(totalAmount)}</td>
+          <tr style={{ background: "#b5d88f", fontWeight: 700, fontSize: 13 }}>
+            <td colSpan={9} style={{ padding: "6px 4px", textAlign: "center" }}>Total</td>
+            <td style={{ padding: "6px 4px", textAlign: "right", fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{formatINR(totalAmount)}</td>
           </tr>
         </tbody>
       </table>
