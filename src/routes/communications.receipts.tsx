@@ -127,10 +127,10 @@ function ReceiptsPage() {
             access_code: latest.access_code || selectedSub!.access_code,
             name: latest.subscriber_name || selectedSub!.name,
             whatsapp_number: latest.whatsapp_number || selectedSub!.whatsapp_number,
-            address_line1: latest.address_line1 || selectedSub!.address_line1,
-            address_line2: latest.address_line2 || selectedSub!.address_line2,
-            city: latest.city || selectedSub!.city,
-            pincode: latest.pincode || selectedSub!.pincode,
+            address_line1: selectedSub!.address_line1,
+            address_line2: selectedSub!.address_line2,
+            city: selectedSub!.city,
+            pincode: selectedSub!.pincode,
           } satisfies SubscriberLite,
         };
       }
@@ -551,16 +551,24 @@ function ReceiptPreview({
 
   return (
     <div id="receipt-printable" className="printable bg-white border rounded-lg overflow-hidden shadow-sm" style={{ fontSize: 11 }}>
-      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center" }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
-        <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
-        <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
-      </div>
-      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "4px 10px", fontWeight: 700, fontSize: 11, display: "flex", justifyContent: "space-between", borderBottom: "1px solid #3f5119" }}>
-        <span>Phone No: {subscriber.whatsapp_number}</span>
-        <span>{subscriber.access_code}</span>
+      {/* Header with logo */}
+      <div style={{ background: "#0f2744", color: "white", padding: "10px 14px", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#c8e3a4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <span style={{ color: "#0f2744", fontWeight: 900, fontSize: 15, fontFamily: "Georgia, serif", letterSpacing: -1 }}>PC</span>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>PANASUNA CHITS (P) LTD.,</div>
+          <div style={{ fontSize: 10, opacity: 0.9 }}>419/151-A, Chinnakadai Street, Salem - 636 001.</div>
+          <div style={{ fontSize: 9, opacity: 0.85 }}>(A ROSCI Institution)</div>
+        </div>
       </div>
 
+      {/* ACKNOWLEDGEMENT title */}
+      <div style={{ background: "#c8e3a4", color: "#0f2744", padding: "5px 10px", fontWeight: 800, fontSize: 13, textAlign: "center", borderBottom: "1px solid #3f5119", letterSpacing: 1 }}>
+        ACKNOWLEDGEMENT
+      </div>
+
+      {/* Address block */}
       <div style={{ background: "#f7eecf", padding: "10px 14px", borderBottom: "1px solid #0f2744", textAlign: "center", fontSize: 11, lineHeight: 1.5 }}>
         <strong>Dear {/^(mr|ms|mrs|dr)\.?/i.test(subscriber.name) ? "" : "Mr./Ms. "}{subscriber.name},</strong>
         {(() => {
@@ -575,14 +583,19 @@ function ReceiptPreview({
         })()}
       </div>
 
+      {/* "We have received your payment" banner */}
+      <div style={{ background: "#f7eecf", padding: "5px 14px", borderBottom: "1px solid #0f2744", textAlign: "center", fontStyle: "italic", fontSize: 11, color: "#0f2744" }}>
+        We have received your payment for the following:
+      </div>
+
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
         <thead>
           <tr style={{ background: "#0f2744", color: "white" }}>
             <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Date</th>
             <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Group</th>
-            <th style={{ padding: "6px", textAlign: "left", border: "1px solid #0f2744" }}>Subscriber Name</th>
+            <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Subscriber Name</th>
             <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Mode of Payment</th>
-            <th style={{ padding: "6px", textAlign: "right", border: "1px solid #0f2744" }}>Chit Amount</th>
+            <th style={{ padding: "6px", textAlign: "center", border: "1px solid #0f2744" }}>Chit Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -593,23 +606,23 @@ function ReceiptPreview({
               <tr key={i}>
                 <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{formatDateDMY(r.date)}</td>
                 <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{r.group}</td>
-                <td style={{ padding: "6px", border: "1px solid #d1d5db" }}>{r.name},</td>
+                <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{r.name}</td>
                 <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db" }}>{r.mode}</td>
-                <td style={{ padding: "6px", textAlign: "right", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace" }}>{formatINR(r.amount)}</td>
+                <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace" }}>{formatINR(r.amount)}</td>
               </tr>
             ))
           )}
           {showVariance && (
             <tr>
               <td colSpan={4} style={{ padding: "6px 10px", border: "1px solid #d1d5db", textAlign: "left", fontWeight: 600 }}>Excess or deficit</td>
-              <td style={{ padding: "6px", textAlign: "right", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace", color: variance > 0 ? "#15803d" : variance < 0 ? "#b91c1c" : "#374151" }}>
+              <td style={{ padding: "6px", textAlign: "center", border: "1px solid #d1d5db", fontFamily: "ui-monospace, monospace", color: variance > 0 ? "#15803d" : variance < 0 ? "#b91c1c" : "#374151" }}>
                 {variance > 0 ? `Excess ${formatINR(variance)}` : variance < 0 ? `Deficit ${formatINR(-variance)}` : "—"}
               </td>
             </tr>
           )}
-          <tr style={{ background: "#b5d88f", fontWeight: 700 }}>
-            <td colSpan={4} style={{ padding: "8px", border: "1px solid #3f5119", textAlign: "left" }}>Total</td>
-            <td style={{ padding: "8px", textAlign: "right", border: "1px solid #3f5119", fontFamily: "ui-monospace, monospace" }}>{formatINR(total)}</td>
+          <tr style={{ background: "#b5d88f", fontWeight: 800 }}>
+            <td colSpan={4} style={{ padding: "9px 10px", border: "1px solid #3f5119", textAlign: "center", fontSize: 14 }}>Total</td>
+            <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #3f5119", fontFamily: "ui-monospace, monospace", fontSize: 14 }}>{formatINR(total)}</td>
           </tr>
         </tbody>
       </table>
